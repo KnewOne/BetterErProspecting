@@ -1,5 +1,6 @@
 ﻿using BetterErProspecting.Tracking;
 using InterestingOreGen;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common.CommandAbbr;
 
 namespace BetterErProspecting.Prospecting;
@@ -263,7 +264,7 @@ public class ProspectingSystem : ModSystem {
 
 			readings.OreReadings[oreCode] = reading;
 
-			var pptTracker = sapi.ModLoader.GetModSystem<Tracking.PptTracker>();
+			var pptTracker = sapi.ModLoader.GetModSystem<PptTracker>();
 			pptTracker?.UpdatePpt(oreCode, reading.PartsPerThousand);
 		}
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
+using BetterErProspecting.Config;
 using HarmonyLib;
 using Vintagestory.GameContent;
 
@@ -32,7 +33,7 @@ public class ReadingLinearFactorPatch {
 		}
 
 		// Replace 7.5 with 5.0 to make it linear (0-1 range * 5.0 = 0-5 index range for 6 elements)
-		matcher.SetOperandAndAdvance(5.0);
+		matcher.SetOperandAndAdvance(Constants.LinearFactorValue);
 
 		return matcher.InstructionEnumeration();
 	}

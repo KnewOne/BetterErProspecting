@@ -198,7 +198,9 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 		var cache = new Dictionary<string, string>();
 
 		WalkBlocksSphere(pos, radius, (walkBlock, x, y, z) => {
-			if (!IsOre(walkBlock, cache, out var _)) return;
+			if (!IsOre(walkBlock, cache, out var key)) return;
+			if (key.Contains("quartz")) return;
+
 			var distanceTo = (int)Math.Round(pos.DistanceTo(x, y, z));
 
 			if (closestOre == -1 || closestOre > distanceTo) {

@@ -11,10 +11,11 @@ using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
 using Vintagestory.GameContent;
+using Constants = BetterErProspecting.Config.Constants;
 
 namespace BetterErProspecting.Patches.Compat.ProspectTogether;
 
-// Changes scaling from 7.5 to 5.0
+// Changes scaling
 [HarmonyPatch(typeof(OreMapLayer), nameof(OreMapLayer.OnDataFromServer))]
 [HarmonyPatchCategory(nameof(BetterErProspect.PatchCategory.ProspectTogetherCompat))]
 public class OreMapLayerPatch {
@@ -50,10 +51,10 @@ public class OreMapLayerPatch {
                     pageCode = pageCodes.Get(reading.Key);
                 }
 
-                // MODIFIED 7.5 to 5.0
+                // MODIFIED 7.5
                 if (reading.Value.TotalFactor > 0.025) {
                     // +2 to offset for our Enum
-                    occurences.Add(new OreOccurence("game:ore-" + reading.Key, pageCode, (RelativeDensity)((int)GameMath.Clamp(reading.Value.TotalFactor * 5.0f, 0, 5) + 2), reading.Value.PartsPerThousand));
+                    occurences.Add(new OreOccurence("game:ore-" + reading.Key, pageCode, (RelativeDensity)((int)GameMath.Clamp(reading.Value.TotalFactor * Constants.LinearFactorValue, 0, 5) + 2), reading.Value.PartsPerThousand));
                 } else if (reading.Value.TotalFactor > PropickReading.MentionThreshold) {
                     occurences.Add(new OreOccurence("game:ore-" + reading.Key, pageCode, RelativeDensity.Miniscule, reading.Value.PartsPerThousand));
                 }
