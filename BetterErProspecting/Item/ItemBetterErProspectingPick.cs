@@ -8,7 +8,6 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
-using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
@@ -132,7 +131,7 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 
 
 		if (DamagedBy != null && DamagedBy.Contains(EnumItemDamageSource.BlockBreaking)) {
-			DamageItem(world, byEntity, itemslot, damage);
+			DamageItem(world, byEntity, itemslot, damage, true);
 		}
 
 		return true;
@@ -342,7 +341,7 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 		sb.Append(Lang.GetL(serverPlayer.LanguageCode, "bettererprospecting:borehole-sample-taken"));
 
 		// Need to hold unique insertion order. OrderedHashSet where art thou ?
-		var blockKeys = new OrderedDictionary<string, string>();
+		var blockKeys = new Vintagestory.API.Datastructures.OrderedDictionary<string, string>();
 		var cache = new Dictionary<string, string>();
 
 		BlockPos blockPos = blockSel.Position.Copy();
