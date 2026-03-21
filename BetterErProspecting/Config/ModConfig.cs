@@ -10,10 +10,6 @@ public class ModConfig {
 	public bool NewDensityMode = true;
 	public int NewDensityDmg = 3;
 
-	// Use standard chunk size for now
-	// public float OreDetectionMultiplier = 1.0f;
-	// public float OreCalculationDivider = 1.0f;
-
 	public bool AddProximityMode = true;
 	public bool ProximityVagueDescriptors = false;
 	public int ProximitySearchRadius = 5;

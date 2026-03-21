@@ -78,16 +78,18 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 		int tm = GetToolMode(itemslot, byPlayer, blockSel);
         int damage = 1;
 
-        // Order here matters. If no tool modes are enabled, mult is still 1. If we swap these it would be zero.
-        if (tm >= 0 && breakIsPropickable(world, blockSel, ref dropQuantityMultiplier)) {
-            string skillItemCode = toolModes[tm].Code.Path;
+        if (byPlayer is IServerPlayer serverPlayer) {
+            // Order here matters. If no tool modes are enabled, mult is still 1. If we swap these it would be zero.
+            if (tm >= 0 && breakIsPropickable(world, blockSel, ref dropQuantityMultiplier)) {
+                string skillItemCode = toolModes[tm].Code.Path;
 
-            if (modeDataStorage.TryGetValue(skillItemCode, out var modeData) && modeData.Execute != null) {
-                damage = modeData.Execute(world, byPlayer, itemslot, blockSel);
-            } else {
-                throw new ArgumentException($"Declared skill item code not handled for propick: {skillItemCode}");
+                if (modeDataStorage.TryGetValue(skillItemCode, out var modeData) && modeData.Execute != null) {
+                    damage = modeData.Execute(world, serverPlayer, itemslot, blockSel);
+                } else {
+                    throw new ArgumentException($"Declared skill item code not handled for propick: {skillItemCode}");
+                }
             }
-		}
+        }
 
         world.BlockAccessor.GetBlock(blockSel.Position).OnBlockBroken(world, blockSel.Position, byPlayer, dropQuantityMultiplier);
 
@@ -99,37 +101,33 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 	}
 
 
-    private int ProbeNode(IWorldAccessor world, IPlayer byPlayer, ItemSlot itemslot, BlockSelection blockSel) {
-        ProbeBlockNodeMode(world, byPlayer.Entity, itemslot, blockSel, api.World.Config.GetAsInt("propickNodeSearchRadius"));
+    private int ProbeNode(IWorldAccessor world, IServerPlayer serverPlayer, ItemSlot itemslot, BlockSelection blockSel) {
+        ProbeBlockNodeMode(world, serverPlayer.Entity, itemslot, blockSel, api.World.Config.GetAsInt("propickNodeSearchRadius"));
         return 1;
     }
 
-    private int ProbeDensity(IWorldAccessor world, IPlayer byPlayer, ItemSlot itemslot, BlockSelection blockSel) {
+    private int ProbeDensity(IWorldAccessor world, IServerPlayer serverPlayer, ItemSlot itemslot, BlockSelection blockSel) {
         if (config.NewDensityMode) {
-            return ProbeBlockDensityMode(byPlayer, blockSel);
-        } else {
-            if (config.OneShotDensity) {
-                if (byPlayer is IServerPlayer severPlayer)
-                    PrintProbeResults(world, severPlayer, itemslot, blockSel.Position);
-                return 3;
-            } else {
-                base.ProbeBlockDensityMode(world, byPlayer.Entity, itemslot, blockSel);
-                return 1;
-            }
+            return ProbeBlockDensityMode(serverPlayer, blockSel);
         }
+
+        if (config.OneShotDensity) {
+            PrintProbeResults(world, serverPlayer, itemslot, blockSel.Position);
+            return 3;
+        }
+
+        base.ProbeBlockDensityMode(world, serverPlayer.Entity, itemslot, blockSel);
+        return 1;
     }
 
 	// Modded Density amount-based search. Square with chunkSize radius around current block. Whole mapheight
-    private int ProbeBlockDensityMode(IPlayer byPlayer, BlockSelection blockSel) {
-		if (byPlayer is not IServerPlayer serverPlayer)
-            return config.NewDensityDmg;
-
+    private int ProbeBlockDensityMode(IServerPlayer serverPlayer, BlockSelection blockSel) {
 		List<DelayedMessage> delayedMessages = [];
 
 		Dictionary<string, int> codeToFoundCount = ProspectingSystem.GenerateBlockData(sapi, blockSel.Position, delayedMessages);
 
         if (!ProspectingSystem.generateReadigs(sapi, blockSel.Position, codeToFoundCount, out PropickReading readings, delayedMessages)) {
-            return config.NewDensityDmg;
+            return 1;
         }
 
         ProPickWorkSpace ppws = ObjectCacheUtil.TryGet<ProPickWorkSpace>(api, "propickworkspace");
@@ -145,11 +143,8 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 	}
 
 	// Sphere search
-    private int ProbeProximity(IWorldAccessor world, IPlayer byPlayer, ItemSlot _, BlockSelection blockSel) {
+    private int ProbeProximity(IWorldAccessor world, IServerPlayer serverPlayer, ItemSlot _, BlockSelection blockSel) {
 		int radius = config.ProximitySearchRadius;
-
-		if (byPlayer is not IServerPlayer serverPlayer)
-            return config.ProximityDmg;
 
 		BlockPos pos = blockSel.Position.Copy();
 		int closestOre = -1;
@@ -185,14 +180,10 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 	}
 
 	// Square radius-based search
-    private int ProbeStone(IWorldAccessor world, IPlayer byPlayer, ItemSlot __, BlockSelection blockSel) {
+    private int ProbeStone(IWorldAccessor world, IServerPlayer serverPlayer, ItemSlot __, BlockSelection blockSel) {
 		int walkRadius = config.StoneSearchRadius;
 
-		if (byPlayer is not IServerPlayer serverPlayer)
-            return config.StoneDmg;
-
 		StringBuilder sb = new StringBuilder();
-
 		sb.AppendLine(Lang.GetL(serverPlayer.LanguageCode, "bettererprospecting:area-sample", walkRadius));
 
 		Dictionary<string, (int Distance, int Count)> rockInfo = new();
@@ -269,23 +260,19 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 	}
 
 	// Cylinder Search
-    private int ProbeBorehole(IWorldAccessor world, IPlayer byPlayer, ItemSlot __, BlockSelection blockSel) {
+    private int ProbeBorehole(IWorldAccessor world, IServerPlayer serverPlayer, ItemSlot __, BlockSelection blockSel) {
 		int radius = config.BoreholeRadius;
-
-		if (byPlayer is not IServerPlayer serverPlayer)
-            return config.BoreholeDmg;
-
 		BlockFacing face = blockSel.Face;
 
 		if (!config.BoreholeScansOre && !config.BoreholeScansStone) {
 			serverPlayer.SendMessage(GlobalConstants.InfoLogChatGroup, Lang.GetL(serverPlayer.LanguageCode, "bettererprospecting:borehole-no-filter"), EnumChatType.Notification);
-            return config.BoreholeDmg;
+            return 1;
 		}
 
 		// It's MY mod. And I get to decide what's important for immersion:tm:
 		if (face != BlockFacing.UP) {
 			serverPlayer.SendMessage(GlobalConstants.InfoLogChatGroup, Lang.GetL(serverPlayer.LanguageCode, "bettererprospecting:borehole-sample-upside"), EnumChatType.Notification);
-            return config.BoreholeDmg;
+            return 1;
 		}
 
 		StringBuilder sb = new StringBuilder();
@@ -328,39 +315,20 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 			return null;
 		}
 
-		foreach (var modeSkill in toolModes) {
-            var data = modeDataStorage[modeSkill.Code.Path];
-
-			if (data.Texture == null) {
-				data.Texture = capi.Gui.LoadSvgWithPadding(data.Asset, 48, 48, 5, ColorUtil.WhiteArgb);
-			}
-
-			modeSkill.WithIcon(capi, data.Texture);
-			modeSkill.TexturePremultipliedAlpha = false;
-		}
+        toolModes.Foreach(skill => {
+            if (skill.Texture != null) return;
+            var asset = modeDataStorage[skill.Code.Path].TextureAssetLocation;
+            skill.Texture = capi.Gui.LoadSvgWithPadding(asset, 48, 48, 5, ColorUtil.WhiteArgb);
+            skill.TexturePremultipliedAlpha = false;
+        });
 
 		return toolModes;
 	}
 	public override int GetToolMode(ItemSlot slot, IPlayer byPlayer, BlockSelection blockSel) {
         return Math.Min(toolModes.Length - 1, slot.Itemstack!.Attributes.GetInt("toolMode"));
 	}
-
-    // public override float OnBlockBreaking(IPlayer player, BlockSelection blockSel, ItemSlot, float remainingResistance, float dt, int counter) {
-    // 	float remain = base.OnBlockBreaking(player, blockSel, itemslot, remainingResistance, dt, counter);
-    //
-    // 	remain = (remain + remainingResistance) / 2.2f;
-    // 	return remain;
-    // }
-
 	public override void OnUnloaded(ICoreAPI coreApi) {
-		foreach (var item in modeDataStorage?.Values!) { item?.Skill?.Dispose(); }
-
-		int num = 0;
-		while (toolModes != null && num < toolModes.Length) {
-			toolModes[num]?.Dispose();
-			num++;
-		}
-
+        modeDataStorage.Values.Foreach(item => item.Skill.Dispose());
 		base.OnUnloaded(coreApi);
 	}
 

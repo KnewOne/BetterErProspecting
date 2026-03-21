@@ -210,6 +210,7 @@ public class ProspectingSystem : ModSystem {
 		return codeToFoundCount;
 	}
 
+    /// <returns>Bool stating if readings have been generated successfully</returns>
 	public static bool generateReadigs(ICoreServerAPI sapi, BlockPos blockPos, Dictionary<string, int> codeToFoundOre, out PropickReading readings, List<DelayedMessage> delayedMessages = null) {
 		delayedMessages ??= [];
 
@@ -219,7 +220,6 @@ public class ProspectingSystem : ModSystem {
 		if (deposits == null) {
 			readings = null;
 			return false;
-
 		}
 
 		const int radius = ItemBetterErProspectingPick.densityRadius;
@@ -227,8 +227,6 @@ public class ProspectingSystem : ModSystem {
 		int mapHeight = world.BlockAccessor.GetTerrainMapheightAt(blockPos);
 		const int zoneDiameter = 2 * radius;
 		int zoneBlocks = zoneDiameter * zoneDiameter * mapHeight;
-		bool iogEnabled = false || sapi.ModLoader.IsModEnabled("interestingoregen");
-
 
 		readings = new PropickReading
 		{
@@ -241,26 +239,23 @@ public class ProspectingSystem : ModSystem {
 				PartsPerThousand = (double)empiricalAmount / zoneBlocks * 1000
 			};
 
-			if (iogEnabled && IogFixNeeded(sapi)) {
-				reading.TotalFactor = 0.5;
-			} else {
-				// This is basically vanilla logic
-				IBlockAccessor blockAccess = world.BlockAccessor;
-				int regsize = blockAccess.RegionSize;
-				IMapRegion reg = world.BlockAccessor.GetMapRegion(blockPos.X / regsize, blockPos.Z / regsize);
-				int lx = blockPos.X % regsize;
-				int lz = blockPos.Z % regsize;
-				IntDataMap2D map = reg.OreMaps[oreCode];
-				int noiseSize = map.InnerSize;
-				float posXInRegionOre = (float)lx / regsize * noiseSize;
-				float posZInRegionOre = (float)lz / regsize * noiseSize;
-				int oreDist = map.GetUnpaddedColorLerped(posXInRegionOre, posZInRegionOre);
-				int[] blockColumn = ppws.GetRockColumn(blockPos.X, blockPos.Z);
-				ppws.depositsByCode[oreCode].GeneratorInst.GetPropickReading(blockPos, oreDist, blockColumn, out _, out double imaginationLandFactor);
+            // This is basically vanilla logic
+            IBlockAccessor blockAccess = world.BlockAccessor;
+            int regsize = blockAccess.RegionSize;
+            IMapRegion reg = world.BlockAccessor.GetMapRegion(blockPos.X / regsize, blockPos.Z / regsize);
+            int lx = blockPos.X % regsize;
+            int lz = blockPos.Z % regsize;
+            IntDataMap2D map = reg.OreMaps[oreCode];
+            int noiseSize = map.InnerSize;
+            float posXInRegionOre = (float)lx / regsize * noiseSize;
+            float posZInRegionOre = (float)lz / regsize * noiseSize;
+            int oreDist = map.GetUnpaddedColorLerped(posXInRegionOre, posZInRegionOre);
+            int[] blockColumn = ppws.GetRockColumn(blockPos.X, blockPos.Z);
+            ppws.depositsByCode[oreCode].GeneratorInst.GetPropickReading(blockPos, oreDist, blockColumn, out _, out double imaginationLandFactor);
 
-				// 0.15 to allow ppt visibility. We will be overwriting this with the patch anyway
-				reading.TotalFactor = Math.Clamp(imaginationLandFactor, 0.15, 1.0);
-			}
+            // 0.15 to allow ppt visibility. We will be overwriting this with the patch anyway
+            reading.TotalFactor = Math.Clamp(imaginationLandFactor, 0.15, 1.0);
+
 
 			readings.OreReadings[oreCode] = reading;
 
@@ -296,13 +291,6 @@ public class ProspectingSystem : ModSystem {
 		}
 
 		delayedMessages.Add(new DelayedMessage(AquiferManager.GetAquiferDirectionHint(world, pos)));
-	}
-
-	private static bool IogFixNeeded(ICoreServerAPI sapi) {
-		IOGCore system = sapi.ModLoader.GetModSystem<IOGCore>();
-		// 2.2.0 should've fixed ghost ore
-		var minVer = new Version("2.2.0");
-		return new Version(system.Mod.Info.Version) >= minVer;
 	}
 
 	private static bool isHoDCompat(ICoreServerAPI sapi, List<DelayedMessage> delayedMessages) {
