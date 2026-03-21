@@ -241,26 +241,22 @@ public class ProspectingSystem : ModSystem {
 				PartsPerThousand = (double)empiricalAmount / zoneBlocks * 1000
 			};
 
-			if (iogEnabled && IogFixNeeded(sapi)) {
-				reading.TotalFactor = 0.5;
-			} else {
-				// This is basically vanilla logic
-				IBlockAccessor blockAccess = world.BlockAccessor;
-				int regsize = blockAccess.RegionSize;
-				IMapRegion reg = world.BlockAccessor.GetMapRegion(blockPos.X / regsize, blockPos.Z / regsize);
-				int lx = blockPos.X % regsize;
-				int lz = blockPos.Z % regsize;
-				IntDataMap2D map = reg.OreMaps[oreCode];
-				int noiseSize = map.InnerSize;
-				float posXInRegionOre = (float)lx / regsize * noiseSize;
-				float posZInRegionOre = (float)lz / regsize * noiseSize;
-				int oreDist = map.GetUnpaddedColorLerped(posXInRegionOre, posZInRegionOre);
-				int[] blockColumn = ppws.GetRockColumn(blockPos.X, blockPos.Z);
-				ppws.depositsByCode[oreCode].GeneratorInst.GetPropickReading(blockPos, oreDist, blockColumn, out _, out double imaginationLandFactor);
+            // This is basically vanilla logic
+            IBlockAccessor blockAccess = world.BlockAccessor;
+            int regsize = blockAccess.RegionSize;
+            IMapRegion reg = world.BlockAccessor.GetMapRegion(blockPos.X / regsize, blockPos.Z / regsize);
+            int lx = blockPos.X % regsize;
+            int lz = blockPos.Z % regsize;
+            IntDataMap2D map = reg.OreMaps[oreCode];
+            int noiseSize = map.InnerSize;
+            float posXInRegionOre = (float)lx / regsize * noiseSize;
+            float posZInRegionOre = (float)lz / regsize * noiseSize;
+            int oreDist = map.GetUnpaddedColorLerped(posXInRegionOre, posZInRegionOre);
+            int[] blockColumn = ppws.GetRockColumn(blockPos.X, blockPos.Z);
+            ppws.depositsByCode[oreCode].GeneratorInst.GetPropickReading(blockPos, oreDist, blockColumn, out _, out double imaginationLandFactor);
 
-				// 0.15 to allow ppt visibility. We will be overwriting this with the patch anyway
-				reading.TotalFactor = Math.Clamp(imaginationLandFactor, 0.15, 1.0);
-			}
+            // 0.15 to allow ppt visibility. We will be overwriting this with the patch anyway
+            reading.TotalFactor = Math.Clamp(imaginationLandFactor, 0.15, 1.0);
 
 			readings.OreReadings[oreCode] = reading;
 
@@ -296,13 +292,6 @@ public class ProspectingSystem : ModSystem {
 		}
 
 		delayedMessages.Add(new DelayedMessage(AquiferManager.GetAquiferDirectionHint(world, pos)));
-	}
-
-	private static bool IogFixNeeded(ICoreServerAPI sapi) {
-		IOGCore system = sapi.ModLoader.GetModSystem<IOGCore>();
-		// 2.2.0 should've fixed ghost ore
-		var minVer = new Version("2.2.0");
-		return new Version(system.Mod.Info.Version) >= minVer;
 	}
 
 	private static bool isHoDCompat(ICoreServerAPI sapi, List<DelayedMessage> delayedMessages) {
