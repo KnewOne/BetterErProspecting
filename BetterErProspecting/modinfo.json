@@ -15,6 +15,6 @@
   "version": "3.2.4",
   "Side": "Universal",
   "dependencies": {
-    "game": "1.22.0"
+    "game": "1.22.0-rc.3"
   }
 }

@@ -15,6 +15,7 @@ using Constants = BetterErProspecting.Config.Constants;
 namespace BetterErProspecting.Patches.Compat.ProspectTogether;
 
 // Changes scaling
+// Prefix because cba
 [HarmonyPatch(typeof(OreMapLayer), nameof(OreMapLayer.OnDataFromServer))]
 [HarmonyPatchCategory(nameof(BetterErProspect.PatchCategory.ProspectTogetherCompat))]
 public class OreMapLayerPatch {

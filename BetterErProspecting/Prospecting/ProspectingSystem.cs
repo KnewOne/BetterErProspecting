@@ -320,7 +320,6 @@ public class ProspectingSystem : ModSystem {
             // 0.15 to allow ppt visibility. We will be overwriting this with the patch anyway
             reading.TotalFactor = Math.Clamp(imaginationLandFactor, 0.15, 1.0);
 
-
 			readings.OreReadings[oreCode] = reading;
             updatePairs.Add((oreCode, reading.PartsPerThousand));
 		}
@@ -356,8 +355,8 @@ public class ProspectingSystem : ModSystem {
             readings.OreReadings.Add(AquiferData.OreReadingKey, chnData);
         }
 
-        delayedMessages.Add(new DelayedMessage(AquiferManager.GetAquiferDirectionHint(world, pos)));
-    }
+		delayedMessages.Add(new DelayedMessage(AquiferManager.GetAquiferDirectionHint(world, pos)));
+	}
 	#endregion
 
 	public override void Dispose() {
