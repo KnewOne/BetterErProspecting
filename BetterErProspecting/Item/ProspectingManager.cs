@@ -126,16 +126,15 @@ public partial class ItemBetterErProspectingPick {
 	public static bool IsRock(Block block, Dictionary<string, string> cache, out string key) {
 		return IsRock(block, cache, out key, out _);
 	}
-	private static bool breakIsPropickable(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel, ref int damage) {
+
+    private static bool breakIsPropickable(IWorldAccessor world, BlockSelection blockSel, ref float dropMultiplier) {
 		Block block = world.BlockAccessor.GetBlock(blockSel.Position);
 
 		if (!block?.Attributes?["propickable"].AsBool() == true) {
-			block.OnBlockBroken(world, blockSel.Position, byPlayer);
-			damage = 1;
 			return false;
 		}
-		block?.OnBlockBroken(world, blockSel.Position, byPlayer, 0);
 
+        dropMultiplier = 0;
 		return true;
 	}
 	#endregion
