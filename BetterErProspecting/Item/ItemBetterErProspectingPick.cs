@@ -18,10 +18,10 @@ namespace BetterErProspecting.Item;
 public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 	ICoreServerAPI sapi;
 	SkillItem[] toolModes;
+    private ILogger log => BetterErProspect.Logger;
 
 	public const int densityRadius = GlobalConstants.ChunkSize;
     public static ModConfig config => ModConfig.Instance;
-
 
     /// <summary>
     ///  Register an outside mod's mode to the propick
@@ -29,31 +29,29 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
     /// <param name="modeData">Mode definition with the corresponding execution method</param>
     /// <param name="regenerateModes">Whether to immediately regenerate tool modes. Useful when adding multiple modes. Still need to call manually after</param>
     public void RegisterMode(ModeData modeData, bool regenerateModes = true) {
-        modeDataStorage[modeData.Skill.Code.Path] = modeData;
+        if (!modeDataStorage.TryAdd(modeData.Skill.Code.Path, modeData))
+            log.Error($"Trying to add an already existing mode {modeData.Skill.Code.Path}");
         if (regenerateModes)
             RegenerateToolModes();
     }
 
-    private readonly OrderedDictionary<string, ModeData> modeDataStorage = new() {
-        { "density", new ModeData("density", "textures/icons/heatmap.svg") },
-        { "node", new ModeData("node", "textures/icons/rocks.svg", "bettererprospecting:node") },
-        { "proximity", new ModeData("proximity", "textures/icons/worldmap/spiral.svg", "bettererprospecting:proximity") },
-        { "stone", new ModeData("stone", "textures/icons/probe_stone.svg", "bettererprospecting:stone", "bettererprospecting") },
-        { "borehole", new ModeData("borehole", "textures/icons/probe_borehole.svg", "bettererprospecting:borehole", "bettererprospecting") }
-	};
+    private readonly OrderedDictionary<string, ModeData> modeDataStorage = new() { };
 
 	public override void OnLoaded(ICoreAPI Api) {
 		sapi = Api as ICoreServerAPI;
 		base.OnLoaded(Api);
 
-        // Need to define here since doing in dict definition would require static methods. Other mods can use RegisterMode
-        modeDataStorage["density"].Execute = ProbeDensity;
-        modeDataStorage["node"].Execute = ProbeNode;
-        modeDataStorage["proximity"].Execute = ProbeProximity;
-        modeDataStorage["stone"].Execute = ProbeStone;
-        modeDataStorage["borehole"].Execute = ProbeBorehole;
+        var modModes = new List<ModeData> {
+            new("density", "textures/icons/heatmap.svg", ProbeDensity),
+            new("node", "textures/icons/rocks.svg", ProbeNode, "bettererprospecting:node"),
+            new("proximity", "textures/icons/worldmap/spiral.svg", ProbeProximity, "bettererprospecting:proximity"),
+            new("stone", "textures/icons/probe_stone.svg", ProbeStone, "bettererprospecting:stone", "bettererprospecting"),
+            new("borehole", "textures/icons/probe_borehole.svg", ProbeBorehole, "bettererprospecting:borehole", "bettererprospecting")
+        };
 
+        modModes.ForEach(m => RegisterMode(m, false));
         RegenerateToolModes();
+
         BetterErProspect.ReloadTools += RegenerateToolModes;
 	}
 

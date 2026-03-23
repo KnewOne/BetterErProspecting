@@ -18,10 +18,18 @@ public class ModeData {
     /// </summary>
     public System.Func<IWorldAccessor, IServerPlayer, ItemSlot, BlockSelection, int> Execute;
 
-    public ModeData(string mode, string assetPath, string nameKey = null, string domain = "game") {
+    public ModeData(
+        string mode,
+        string assetPath,
+        System.Func<IWorldAccessor, IServerPlayer, ItemSlot, BlockSelection, int> execute = null,
+        string nameKey = null,
+        string domain = "game") {
         TextureAssetLocation = $"{domain}:{assetPath}";
         Skill = new SkillItem { Code = new AssetLocation($"{domain}:{mode}") };
-        if (nameKey != null) Skill.Name = Lang.Get(nameKey);
-	}
+        Execute = execute;
+
+        if (nameKey != null)
+            Skill.Name = Lang.Get(nameKey);
+    }
 }
 
