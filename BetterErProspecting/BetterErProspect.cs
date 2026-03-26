@@ -67,12 +67,17 @@ public class BetterErProspect : ModSystem {
 
             // When a client modifies settings from his side in MP, we need to reload ~ SettingChanged doesn't seem to capture him
             // TODO: nag maltiez to (?) fix this
-            (system.GetConfig("bettererprospecting") as ConfigLib.Config)!.ConfigSaved += cfg => {
-                cfg.AssignSettingsValues(Config);
-                ReloadTools?.Invoke();
-                PatchUnpatch();
-            };
+            var config = (ConfigLib.Config)system.GetConfig("bettererprospecting");
+            config!.ConfigSaved -= OnConfigSaved;  // remove previous if any
+            config!.ConfigSaved += OnConfigSaved;
+
         };
+        void OnConfigSaved(ConfigLib.Config cfg) {
+            cfg.AssignSettingsValues(Config);
+            PatchUnpatch();
+            ReloadTools?.Invoke();
+        }
+
     }
 
 	public override void Dispose() {
