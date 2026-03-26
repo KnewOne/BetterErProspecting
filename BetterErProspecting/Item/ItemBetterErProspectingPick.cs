@@ -8,7 +8,6 @@ using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
 using Vintagestory.API.Config;
-using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
@@ -40,6 +39,7 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 
 	public override void OnLoaded(ICoreAPI Api) {
 		sapi = Api as ICoreServerAPI;
+        base.OnLoaded(Api);
 
         var modModes = new List<ModeData> {
             new("density", "textures/icons/heatmap.svg", ProbeDensity),
@@ -52,7 +52,6 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
         modModes.ForEach(m => RegisterMode(m, false));
         RegenerateToolModes();
 
-        base.OnLoaded(Api);
 
         BetterErProspect.ReloadTools += RegenerateToolModes;
     }
