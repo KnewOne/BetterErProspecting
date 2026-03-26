@@ -4,6 +4,9 @@ public class ModConfig {
 	public static string ConfigName = "BetterErProspecting.json";
 	public static ModConfig Instance { get; set; } = new ModConfig();
 
+    public static string[] SettingsForceLoad = [nameof(EnableDensityMode), nameof(NewDensityMode), nameof(AddBoreHoleMode), nameof(AddStoneMode), nameof(AddProximityMode)];
+    public static string[] SettingsPatch = [nameof(NewDensityMode), nameof(StoneSearchCreatesReadings)];
+
 	public bool EnableDensityMode = true;
 	public bool OneShotDensity = false;
 

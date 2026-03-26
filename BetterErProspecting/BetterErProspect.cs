@@ -5,12 +5,12 @@ using BetterErProspecting.Config;
 using BetterErProspecting.Item;
 using ConfigLib;
 using HarmonyLib;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.GameContent;
 
 namespace BetterErProspecting;
 
-// I swear I won't change modsystem name anymore
 public class BetterErProspect : ModSystem {
 	public static ILogger Logger { get; private set; }
 	public static ICoreAPI Api { get; private set; }
@@ -29,11 +29,11 @@ public class BetterErProspect : ModSystem {
 
 		try {
 			ModConfig.Instance = api.LoadModConfig<ModConfig>(ModConfig.ConfigName) ?? new ModConfig();
-			api.StoreModConfig(ModConfig.Instance, ModConfig.ConfigName);
+            api.StoreModConfig(Config, ModConfig.ConfigName);
 		} catch (Exception) { ModConfig.Instance = new ModConfig(); }
 
 		if (api.ModLoader.IsModEnabled("configlib")) {
-			SubscribeToConfigChange(api);
+            SubscribeToConfigChange();
 		}
 
 		PatchUnpatch();
@@ -41,28 +41,39 @@ public class BetterErProspect : ModSystem {
 	}
 
 
-
-	private void SubscribeToConfigChange(ICoreAPI api) {
-		ConfigLibModSystem system = api.ModLoader.GetModSystem<ConfigLibModSystem>();
-
+    private void SubscribeToConfigChange() {
+        ConfigLibModSystem system = Api.ModLoader.GetModSystem<ConfigLibModSystem>();
+        // Server deals with
 		system.SettingChanged += (domain, _, setting) => {
-			if (domain != "bettererprospecting")
-				return;
+            if (domain != "bettererprospecting") return;
+            setting.AssignSettingValue(Config);
 
-			setting.AssignSettingValue(ModConfig.Instance);
-
-			string[] settingsToolReload = [nameof(ModConfig.EnableDensityMode), nameof(ModConfig.NewDensityMode), nameof(ModConfig.AddBoreHoleMode), nameof(ModConfig.AddStoneMode), nameof(ModConfig.AddProximityMode)];
-			string[] settingsPatch = [nameof(ModConfig.NewDensityMode)];
-
-			if (settingsToolReload.Contains(setting.YamlCode)) {
+            if (ModConfig.SettingsForceLoad.Contains(setting.YamlCode)) {
 				ReloadTools?.Invoke();
 			}
 
-			if (settingsPatch.Contains(setting.YamlCode)) {
+            if (ModConfig.SettingsPatch.Contains(setting.YamlCode)) {
 				PatchUnpatch();
 			}
 		};
-	}
+
+        if (Api.Side == EnumAppSide.Server || (Api as ICoreClientAPI)?.IsSinglePlayer == true) return;
+
+        // When a client connects to a MP server, it might have outdated values
+        system.ConfigsLoaded += () => {
+            system.GetConfig("bettererprospecting")?.AssignSettingsValues(Config);
+            PatchUnpatch();
+            ReloadTools?.Invoke();
+
+            // When a client modifies settings from his side in MP, we need to reload ~ SettingChanged doesn't seem to capture him
+            // TODO: nag maltiez to (?) fix this
+            (system.GetConfig("bettererprospecting") as ConfigLib.Config)!.ConfigSaved += cfg => {
+                cfg.AssignSettingsValues(Config);
+                ReloadTools?.Invoke();
+                PatchUnpatch();
+            };
+        };
+    }
 
 	public override void Dispose() {
 		harmony?.UnpatchAll(Mod.Info.ModID);
