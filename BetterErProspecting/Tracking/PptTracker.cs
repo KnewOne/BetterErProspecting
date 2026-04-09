@@ -22,7 +22,7 @@ public class PptData {
 
     [ProtoMember(2)] public double MaxPpt;
 
-    [ProtoIgnore] private readonly Lock _lock = new();
+    [ProtoIgnore] private readonly object _lock = new();
 
 	public void Update(double ppt) {
 		lock (_lock) {
