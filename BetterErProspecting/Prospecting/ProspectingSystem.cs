@@ -272,41 +272,34 @@ public class ProspectingSystem : ModSystem {
 	}
 
 	#region Compat
-	private static void addMiscReadings(ICoreServerAPI sapi, PropickReading readings, BlockPos blockPos, List<DelayedMessage> delayedMessages)
-	{
-		// Hydrate Or Diedrate
-		if (!sapi.ModLoader.IsModEnabled("hydrateordiedrate")) return;
-		if (isHoDCompat(sapi, delayedMessages)) {
-			hydrateOrDiedrate(sapi, readings, blockPos, delayedMessages);
-		}
-	}
 
-	private static void hydrateOrDiedrate(ICoreServerAPI sapi, PropickReading readings, BlockPos pos, List<DelayedMessage> delayedMessages) {
-		var world = sapi.World;
-		var chnData = AquiferManager.GetAquiferChunkData(world, pos)?.Data;
-		if (chnData == null) {
-			return;
-		}
+    private static void addMiscReadings(ICoreServerAPI sapi, PropickReading readings, BlockPos blockPos, List<DelayedMessage> delayedMessages) {
+        if (sapi.ModLoader.IsModEnabled("hydrateordiedrate")) addHoDReadingsIfCan(sapi, readings, blockPos, delayedMessages);
+    }
 
-		var hydrateConfig = HydrateOrDiedrate.Config.ModConfig.Instance;
+    private static void addHoDReadingsIfCan(ICoreServerAPI sapi, PropickReading readings, BlockPos pos, List<DelayedMessage> delayedMessages) {
+        HydrateOrDiedrateModSystem system = sapi.ModLoader.GetModSystem<HydrateOrDiedrateModSystem>();
+        // Latest bump to 2.2.13 due to modified namespace
+        var minVer = new Version("2.2.13");
+        if (new Version(system.Mod.Info.Version) <= minVer) {
+            delayedMessages.Add(new DelayedMessage($"[BetterEr Prospecting] Please update HydrateOrDietrade to at least {minVer.ToString()} for aquifer support"));
+            return;
+        }
 
-		if (hydrateConfig.GroundWater.ShowAquiferProspectingDataOnMap) {
-			readings.OreReadings.Add(AquiferData.OreReadingKey, chnData);
-		}
+        var world = sapi.World;
+        var chnData = AquiferManager.GetAquiferChunkData(world, pos)?.Data;
+        if (chnData == null) {
+            return;
+        }
 
-		delayedMessages.Add(new DelayedMessage(AquiferManager.GetAquiferDirectionHint(world, pos)));
-	}
+        var hydrateConfig = HydrateOrDiedrate.Config.ModConfig.Instance;
 
-	private static bool isHoDCompat(ICoreServerAPI sapi, List<DelayedMessage> delayedMessages) {
-		HydrateOrDiedrateModSystem system = sapi.ModLoader.GetModSystem<HydrateOrDiedrateModSystem>();
-		// Latest bump to 2.2.13 due to modified namespace
-		// Blame HoD
-		var minVer = new Version("2.2.13");
-		if (new Version(system.Mod.Info.Version) >= minVer) return true;
-		delayedMessages.Add(new DelayedMessage($"[BetterEr Prospecting] Please update HydrateOrDietrade to at least {minVer.ToString()} for aquifer support"));
-		return false;
+        if (hydrateConfig.GroundWater.ShowAquiferProspectingDataOnMap) {
+            readings.OreReadings.Add(AquiferData.OreReadingKey, chnData);
+        }
 
-	}
+        delayedMessages.Add(new DelayedMessage(AquiferManager.GetAquiferDirectionHint(world, pos)));
+    }
 	#endregion
 
 	public override void Dispose() {
