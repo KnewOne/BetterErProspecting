@@ -8,7 +8,7 @@
 
   <ItemGroup>
     <Reference Include="configlib">
-      <HintPath>$(VSLIBS)/dlls/configlib.dll</HintPath>
+        <HintPath>$(VSLIBS)\dlls\configlib.dll</HintPath>
 		<Private>false</Private>
     </Reference>
     <Reference Include="HydrateOrDiedrate">
@@ -16,11 +16,11 @@
 		<Private>false</Private>
     </Reference>
     <Reference Include="InterestingOreGen">
-      <HintPath>..\..\VSLibs\dlls\InterestingOreGen.dll</HintPath>
+        <HintPath>$(VSLIBS)\dlls\InterestingOreGen.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="ProspectTogether">
-      <HintPath>..\..\VSLibs\dlls\ProspectTogether.dll</HintPath>
+        <HintPath>$(VSLIBS)\dlls\ProspectTogether.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="protobuf-net">

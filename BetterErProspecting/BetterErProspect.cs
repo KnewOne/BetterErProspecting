@@ -38,12 +38,17 @@ public class BetterErProspect : ModSystem {
 
 		PatchUnpatch();
 		api.RegisterItemClass("ItemBetterErProspectingPick", typeof(ItemBetterErProspectingPick));
+
+        if (Api.ModLoader.IsModEnabled("prospecttogether")) {
+            UnpatchProspectTogether();
+            harmony.PatchCategory(nameof(PatchCategory.ProspectTogetherCompat));
+        }
 	}
 
 
     private void SubscribeToConfigChange() {
         ConfigLibModSystem system = Api.ModLoader.GetModSystem<ConfigLibModSystem>();
-        // Server deals with
+
 		system.SettingChanged += (domain, _, setting) => {
             if (domain != "bettererprospecting") return;
             setting.AssignSettingValue(Config);
@@ -61,18 +66,16 @@ public class BetterErProspect : ModSystem {
 
         // When a client connects to a MP server, it might have outdated values
         system.ConfigsLoaded += () => {
-            system.GetConfig("bettererprospecting")?.AssignSettingsValues(Config);
-            PatchUnpatch();
-            ReloadTools?.Invoke();
+            var config = (ConfigLib.Config)system.GetConfig("bettererprospecting");
+            ApplyConfigChange(config!);
 
             // When a client modifies settings from his side in MP, we need to reload ~ SettingChanged doesn't seem to capture him
             // TODO: nag maltiez to (?) fix this
-            var config = (ConfigLib.Config)system.GetConfig("bettererprospecting");
-            config!.ConfigSaved -= OnConfigSaved;  // remove previous if any
-            config!.ConfigSaved += OnConfigSaved;
-
+            config!.ConfigSaved -= ApplyConfigChange;
+            config!.ConfigSaved += ApplyConfigChange;
         };
-        void OnConfigSaved(ConfigLib.Config cfg) {
+
+        void ApplyConfigChange(ConfigLib.Config cfg) {
             cfg.AssignSettingsValues(Config);
             PatchUnpatch();
             ReloadTools?.Invoke();
@@ -99,11 +102,6 @@ public class BetterErProspect : ModSystem {
 
 		if (ModConfig.Instance.StoneSearchCreatesReadings) {
 			harmony.PatchCategory(nameof(PatchCategory.StoneReadings));
-		}
-
-		if (Api.ModLoader.IsModEnabled("prospecttogether")) {
-			UnpatchProspectTogether();
-			harmony.PatchCategory(nameof(PatchCategory.ProspectTogetherCompat));
 		}
 	}
 

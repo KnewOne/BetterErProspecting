@@ -233,6 +233,8 @@ public class ProspectingSystem : ModSystem {
 			Position = blockPos.ToVec3d()
 		};
 
+        var updatePairs = new List<(string oreCode, double ppt)>();
+
 		foreach (var (oreCode, empiricalAmount) in codeToFoundOre) {
 			var reading = new OreReading
 			{
@@ -258,10 +260,12 @@ public class ProspectingSystem : ModSystem {
 
 
 			readings.OreReadings[oreCode] = reading;
-
-			var pptTracker = sapi.ModLoader.GetModSystem<PptTracker>();
-			pptTracker?.UpdatePpt(oreCode, reading.PartsPerThousand);
+            updatePairs.Add((oreCode, reading.PartsPerThousand));
 		}
+
+
+        var pptTracker = sapi.ModLoader.GetModSystem<PptTracker>();
+        pptTracker?.UpdatePpt(updatePairs);
 
 		addMiscReadings(sapi, readings, blockPos, delayedMessages);
 		return true;

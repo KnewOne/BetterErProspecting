@@ -193,18 +193,19 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 		var cache = new Dictionary<string, string>();
 		api.World.BlockAccessor.WalkBlocks(blockPos.AddCopy(walkRadius, walkRadius, walkRadius), blockEnd,
 			(walkBlock, x, y, z) => {
+                if (!IsRock(walkBlock, cache, out string key)) return;
+                int distance = -1;
 
-				if (IsRock(walkBlock, cache, out string key)) {
-					int distance = (int)blockSel.Position.DistanceTo(new BlockPos(x, y, z));
+                // No need for this in this case
+                if (config.StonePercentSearch)
+                    distance = (int)blockSel.Position.DistanceTo(new BlockPos(x, y, z));
 
-					if (rockInfo.TryGetValue(key, out var existing)) {
-						rockInfo[key] = (Math.Min(existing.Distance, distance), existing.Count + 1);
-					} else {
-						rockInfo[key] = (distance, 1);
-					}
-				}
-
-			});
+                if (rockInfo.TryGetValue(key, out var existing)) {
+                    rockInfo[key] = (Math.Min(existing.Distance, distance), existing.Count + 1);
+                } else {
+                    rockInfo[key] = (distance, 1);
+                }
+            });
 
 
 		if (rockInfo.Count == 0) {

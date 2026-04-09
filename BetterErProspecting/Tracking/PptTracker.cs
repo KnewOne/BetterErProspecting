@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using BetterErProspecting.Prospecting;
 using ProtoBuf;
 using Vintagestory.API.Client;
@@ -18,10 +19,10 @@ namespace BetterErProspecting.Tracking;
 public class PptData {
 	[ProtoMember(1)]
 	public double MinPpt = 1000.0;
-	[ProtoMember(2)]
-	public double MaxPpt = 0.0;
 
-	[ProtoIgnore] private readonly object _lock = new();
+    [ProtoMember(2)] public double MaxPpt;
+
+    [ProtoIgnore] private readonly Lock _lock = new();
 
 	public void Update(double ppt) {
 		lock (_lock) {
@@ -29,6 +30,14 @@ public class PptData {
 			if (ppt > MaxPpt) MaxPpt = ppt;
 		}
 	}
+}
+
+[ProtoContract]
+public class PptDataPacket(Dictionary<string, PptData> data) {
+    [ProtoMember(1)] public Dictionary<string, PptData> codeToData { get; set; } = data;
+
+    public PptDataPacket() : this(new Dictionary<string, PptData>()) {
+    }
 }
 
 public class PptTracker : ModSystem {
@@ -56,8 +65,7 @@ public class PptTracker : ModSystem {
 			.EndSub();
 
 		serverChannel = api.Network.RegisterChannel(ChannelName)
-			.RegisterMessageType<PptDataPacket>()
-			.RegisterMessageType<PptDataUpdatePacket>();
+            .RegisterMessageType<PptDataPacket>();
 
 		api.Event.PlayerJoin += OnPlayerJoin;
 		api.Event.SaveGameLoaded += OnSaveGameLoaded;
@@ -67,12 +75,11 @@ public class PptTracker : ModSystem {
 	public override void StartClientSide(ICoreClientAPI api) {
 		base.StartClientSide(api);
 		capi = api;
+        oreData.Clear();
 
 		clientChannel = api.Network.RegisterChannel(ChannelName)
 			.RegisterMessageType<PptDataPacket>()
-			.RegisterMessageType<PptDataUpdatePacket>()
-			.SetMessageHandler<PptDataPacket>(OnClientReceivedFullData)
-			.SetMessageHandler<PptDataUpdatePacket>(OnClientReceivedUpdate);
+            .SetMessageHandler<PptDataPacket>(OnClientReceivePacket);
 	}
 
 	private void OnSaveGameLoaded() {
@@ -86,7 +93,6 @@ public class PptTracker : ModSystem {
 				oreData[kvp.Key] = kvp.Value;
 			}
 			Mod.Logger.Debug($"[BetterErProspecting] Loaded ppt data for {loaded.Count} ore codes from save");
-			sapi.Event.ServerRunPhase(EnumServerRunPhase.RunGame, InsertMissingOreCodes);
 		} else {
 			// Absolute cold start. Lets normalize all readings
 			sapi.ModLoader.GetModSystem<ProspectingSystem>().ReprospectTask(null, null).Wait();
@@ -108,19 +114,6 @@ public class PptTracker : ModSystem {
 		Mod.Logger.Debug($"[BetterErProspecting] Saved ppt data for {dataToSave.Count} ore codes");
 	}
 
-	private void OnClientReceivedFullData(PptDataPacket packet) {
-		if (packet?.AllData == null)
-			return;
-
-		oreData.Clear();
-		foreach (var kvp in packet.AllData) {
-			oreData[kvp.Key] = kvp.Value;
-		}
-
-		Mod.Logger.Debug($"[BetterErProspecting] Client received ppt data for {packet.AllData.Count} ore codes");
-	}
-
-
 	private void OnPlayerJoin(IServerPlayer byPlayer) {
 		if (oreData.IsEmpty)
 			return;
@@ -129,31 +122,31 @@ public class PptTracker : ModSystem {
 		serverChannel?.SendPacket(packet, byPlayer);
 	}
 
-	public void UpdatePpt(string oreCode, double ppt) {
+    private void OnClientReceivePacket(PptDataPacket packet) {
+        if (packet?.codeToData == null)
+            return;
 
-		if (string.IsNullOrEmpty(oreCode))
-			return;
+        foreach (var kvp in packet.codeToData) {
+            oreData[kvp.Key] = kvp.Value;
+        }
 
-		var data = oreData.GetOrAdd(oreCode, _ => new PptData());
-		data.Update(ppt);
+        Mod.Logger.Debug($"[BetterErProspecting] Client received ppt data for ({string.Join(", ", packet.codeToData.Keys)}) ore codes");
+    }
 
-		SendUpdateToClients(oreCode, data);
-	}
+    public void UpdatePpt(List<(string oreCode, double ppt)> updatePairs) {
+        var updatePacket = new PptDataPacket(new Dictionary<string, PptData>());
 
-	private void SendUpdateToClients(string oreCode, PptData data) {
-		if (serverChannel == null)
-			return;
+        foreach (var pair in updatePairs) {
+            if (string.IsNullOrEmpty(pair.oreCode))
+                return;
 
-		var packet = new PptDataUpdatePacket(oreCode, data);
-		serverChannel.BroadcastPacket(packet);
-	}
+            var data = oreData.GetOrAdd(pair.oreCode, _ => new PptData());
+            data.Update(pair.ppt);
 
-	private void OnClientReceivedUpdate(PptDataUpdatePacket packet) {
-		if (packet == null || string.IsNullOrEmpty(packet.OreCode) || packet.Data == null)
-			return;
+            updatePacket.codeToData[pair.oreCode] = data;
+        }
 
-		oreData[packet.OreCode] = packet.Data;
-		Mod.Logger.Debug($"[BetterErProspecting] Client received ppt data update for {packet.OreCode}");
+        serverChannel?.BroadcastPacket(updatePacket);
 	}
 
 	public void AdjustFactor(PropickReading readings) {
@@ -217,35 +210,18 @@ public class PptTracker : ModSystem {
 
 	private void ScheduleBackfillWhenReady(int attemptCount = 0) {
 		const int maxAttempts = 30;
-		const int delayMs = 1000;
 
 		sapi.Event.RegisterCallback((dt) =>
 		{
 			var ppws = ObjectCacheUtil.TryGet<ProPickWorkSpace>(sapi, "propickworkspace");
 			if (ppws?.pageCodes is { Count: > 0 }) {
-				Mod.Logger.Debug($"[BetterErProspecting] ProPickWorkSpace pageCodes ready with {ppws.pageCodes.Count} entries, starting backfill");
 				FillOreDataFromReadings();
 			} else if (attemptCount < maxAttempts) {
-				Mod.Logger.Debug($"[BetterErProspecting] ProPickWorkSpace pageCodes not ready, retrying in {delayMs}ms (attempt {attemptCount + 1}/{maxAttempts})");
 				ScheduleBackfillWhenReady(attemptCount + 1);
 			} else {
-				Mod.Logger.Warning("[BetterErProspecting] Timed out waiting for ProPickWorkSpace pageCodes to be populated");
+                Mod.Logger.Error("[BetterErProspecting] Timed out waiting for ProPickWorkSpace pageCodes to be populated");
 			}
-		}, delayMs);
-	}
-
-	private void InsertMissingOreCodes() {
-		var ppws = ObjectCacheUtil.TryGet<ProPickWorkSpace>(sapi, "propickworkspace");
-
-		var missingOreCodes = new HashSet<string>();
-		foreach (var oreCode in ppws.pageCodes.Keys.Where(oreCode => !oreData.ContainsKey(oreCode))) {
-			missingOreCodes.Add(oreCode);
-		}
-
-		foreach (var oreCode in missingOreCodes) {
-			var data = oreData.GetOrAdd(oreCode, _ => new PptData());
-			SendUpdateToClients(oreCode, data);
-		}
+        }, 1000);
 	}
 
 	private void FillOreDataFromReadings() {
@@ -255,11 +231,9 @@ public class PptTracker : ModSystem {
 			return;
 		}
 
-		InsertMissingOreCodes();
 		Mod.Logger.Notification($"[BetterErProspecting] Backfilling {ppws.pageCodes.Keys.Count} ore codes: {string.Join(", ", ppws.pageCodes.Keys)}");
 
 		var allReadings = getAllPlayerReadings(sapi);
-		int readingCount = allReadings.Count;
 
 		// Update from each reading server-side
 		foreach (var reading in allReadings) {
@@ -269,12 +243,14 @@ public class PptTracker : ModSystem {
 			}
 		}
 
-		// Only send once per ore code
+        var updatePacket = new PptDataPacket(new Dictionary<string, PptData>());
 		foreach (var data in oreData) {
-			SendUpdateToClients(data.Key, data.Value);
+            updatePacket.codeToData[data.Key] = data.Value;
 		}
 
-		Mod.Logger.Debug($"[BetterErProspecting] Backfilled from {readingCount} readings");
+        serverChannel?.BroadcastPacket(updatePacket);
+
+        Mod.Logger.Debug($"[BetterErProspecting] Backfilled from {allReadings.Count} readings");
 	}
 
 	// Fills per-player data in oml as well as returns list of all readings
@@ -299,4 +275,9 @@ public class PptTracker : ModSystem {
 		byte[] data = sapi.WorldManager.SaveGame.GetData("oreMapMarkers-" + playeruid);
 		return data != null ? (oml.PropickReadingsByPlayer[playeruid] = SerializerUtil.Deserialize<List<PropickReading>>(data)) : (oml.PropickReadingsByPlayer[playeruid] = []);
 	}
+
+    public override void Dispose() {
+        oreData.Clear();
+        base.Dispose();
+    }
 }
