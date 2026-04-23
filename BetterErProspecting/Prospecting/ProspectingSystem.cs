@@ -174,7 +174,7 @@ public class ProspectingSystem : ModSystem {
 		const int radius = ItemBetterErProspectingPick.densityRadius;
 
 		int mapHeight = api.World.BlockAccessor.GetTerrainMapheightAt(blockPos);
-		string[] knownBlacklistedCodes = ["flint", "quartz"];
+        var blacklistedCodes = BetterErProspect.Config.DensityBlackListedOres.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct().ToHashSet();
 
 		var ppws = ObjectCacheUtil.TryGet<ProPickWorkSpace>(api, "propickworkspace");
 
@@ -193,7 +193,7 @@ public class ProspectingSystem : ModSystem {
 				bool isRock = !isOre && ItemBetterErProspectingPick.IsRock(walkBlock, blockCache, out _, out key);
 
 				if (!isOre && !isRock) return;
-				if (knownBlacklistedCodes.Contains(key))
+				if (blacklistedCodes.Contains(key))
 					return;
 
 				if (depositKeys.Contains(key)) {

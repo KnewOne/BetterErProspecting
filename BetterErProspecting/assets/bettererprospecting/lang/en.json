@@ -46,6 +46,8 @@
   "NewDensityMode-description": "Replaces vanilla mode with the new density mode",
   "NewDensityDmg-setting": "New Density Tool Damage",
   "NewDensityDmg-description": "Tool damage for new density mode",
+  "DensityBlackListedOres-setting": "Density blacklist ores",
+  "DensityBlackListedOres-description": "Comma-separated ore codes ignored by density mode. Use ore key. Default if you're not sure.",
 
   "AddProximityMode-setting": "Enable Proximity Mode",
   "AddProximityMode-description": "Enables proximity mode. Looks for closest ore. Sphere-based",

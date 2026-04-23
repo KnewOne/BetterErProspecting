@@ -10,8 +10,11 @@ public class ModConfig {
 	public bool EnableDensityMode = true;
 	public bool OneShotDensity = false;
 
+
 	public bool NewDensityMode = true;
 	public int NewDensityDmg = 3;
+
+    public string DensityBlackListedOres = "flint, quartz";
 
 	public bool AddProximityMode = true;
 	public bool ProximityVagueDescriptors = false;

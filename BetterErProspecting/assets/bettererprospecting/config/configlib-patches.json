@@ -45,6 +45,14 @@
       "weight": 1.2
     },
     {
+      "code": "DensityBlackListedOres",
+      "ingui": "DensityBlackListedOres-setting",
+      "type": "string",
+      "comment": "DensityBlackListedOres-description",
+      "default": "flint, quartz",
+      "weight": 1.25
+    },
+    {
       "type": "separator",
       "title": "Proximity",
       "weight": 12.0,
