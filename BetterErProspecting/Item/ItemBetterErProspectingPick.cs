@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using BetterErProspecting.Item.Data;
 using BetterErProspecting.Prospecting;
+using BetterErProspecting.Tracking;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Common.Entities;
@@ -125,9 +126,12 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 
 		Dictionary<string, int> codeToFoundCount = ProspectingSystem.GenerateBlockData(sapi, blockSel.Position, delayedMessages);
 
-        if (!ProspectingSystem.generateReadigs(sapi, blockSel.Position, codeToFoundCount, out PropickReading readings, delayedMessages)) {
+        if (!ProspectingSystem.generateReadigs(sapi, blockSel.Position, codeToFoundCount, out PropickReading readings, out var updatePairs, delayedMessages: delayedMessages)) {
             return 1;
         }
+
+        var pptTracker = sapi.ModLoader.GetModSystem<PptTracker>();
+        pptTracker?.UpdatePpt(updatePairs);
 
         ProPickWorkSpace ppws = ObjectCacheUtil.TryGet<ProPickWorkSpace>(api, "propickworkspace");
 
@@ -149,9 +153,11 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 		int closestOre = -1;
 		var cache = new Dictionary<string, string>();
 
+        var blacklistedCodes = BetterErProspect.Config.DensityBlackListedOres.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct().ToHashSet();
+
 		WalkBlocksSphere(pos, radius, (walkBlock, x, y, z) => {
 			if (!IsOre(walkBlock, cache, out var key)) return;
-			if (key.Contains("quartz")) return;
+            if (blacklistedCodes.Contains(key)) return;
 
 			var distanceTo = (int)Math.Round(pos.DistanceTo(x, y, z));
 

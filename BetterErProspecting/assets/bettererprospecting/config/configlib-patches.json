@@ -1,5 +1,5 @@
 {
-  "version": 27,
+  "version": 28,
   "file": "BetterErProspecting.json",
   "settings": [
     {
@@ -219,6 +219,18 @@
       "comment": "DebugMode-description",
       "default": false,
       "weight": 100.0
+    },
+    {
+      "code": "ReprospectParellelism",
+      "ingui": "ReprospectParellelism-setting",
+      "type": "integer",
+      "comment": "ReprospectParellelism-description",
+      "default": 0,
+      "weight": 101.0,
+      "range": {
+        "min": 0,
+        "max": 100
+      }
     }
   ]
 }

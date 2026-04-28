@@ -1,6 +1,4 @@
 ﻿using BetterErProspecting.Tracking;
-using InterestingOreGen;
-using Vintagestory.API.Client;
 using Vintagestory.API.Common.CommandAbbr;
 
 namespace BetterErProspecting.Prospecting;
@@ -27,8 +25,10 @@ using Vintagestory.ServerMods;
 
 public class ProspectingSystem : ModSystem {
 	private static ILogger logger => BetterErProspect.Logger;
-	private bool isReprospecting;
 	private ICoreServerAPI sapi;
+    private PptTracker pptTracker;
+
+    CancellationTokenSource _cts = new();
 
 	public override void StartPre(ICoreAPI api) {
 		base.StartPre(api);
@@ -38,15 +38,28 @@ public class ProspectingSystem : ModSystem {
 	public override void StartServerSide(ICoreServerAPI api) {
 		base.StartServerSide(api);
 		sapi = api;
+        pptTracker = api.ModLoader.GetModSystem<PptTracker>();
 		api.ChatCommands.GetOrCreate("btrpr")
 			.RequiresPrivilege(Privilege.controlserver)
+            .BeginSub("reprospectcancell")
+            .WithExamples("/btrpr reprospectcancell")
+            .HandleWith(CancelReprospect)
+            .EndSub()
 			.BeginSub("reprospect")
-				.WithDesc("Regenerates prospecting data for all players ( including offline ). Optionally only for one player. Expensive operation.")
-				.WithExamples("/btrpr reprospect", "/btrpr reprospect KnewOne")
-				.WithArgs(new OnlinePlayerArgParser("player", api, isMandatoryArg: false))
-				.HandleWith(Reprospect)
+            .WithDesc("Regenerates prospecting data for all players ( including offline ). Optionally only for one player. Expensive operation.")
+            .WithExamples("/btrpr reprospect", "/btrpr reprospect KnewOne")
+            .WithArgs(new OnlinePlayerArgParser("player", api, isMandatoryArg: false))
+            .HandleWith(Reprospect)
 			.EndSub();
 	}
+
+    private TextCommandResult CancelReprospect(TextCommandCallingArgs args) {
+        var oldCts = Interlocked.Exchange(ref _cts, new CancellationTokenSource());
+        oldCts.Cancel();
+        oldCts.Dispose();
+        isReprospecting = false;
+        return TextCommandResult.Success("Done");
+    }
 
 	private TextCommandResult Reprospect(TextCommandCallingArgs args) {
 		if (isReprospecting) {
@@ -59,7 +72,7 @@ public class ProspectingSystem : ModSystem {
 		// Background
 		Task.Run(() => { _ = ReprospectTask(caller, targetPlayer); });
 
-		return TextCommandResult.Success("[BetterEr Prospect] Began reprospecting");
+        return TextCommandResult.Success("[BetterEr Prospecting] Began reprospecting");
 	}
 	private readonly ConcurrentDictionary<(int, int), Task> chunkLoadTasks = new();
 
@@ -79,16 +92,17 @@ public class ProspectingSystem : ModSystem {
 		});
 	}
 
+    private bool isReprospecting;
+    private readonly Lock notifyLock = new();
+
 	// This might create lag or memory issues. Need more feedback on large world/many players
 	public async Task ReprospectTask(IServerPlayer caller, IServerPlayer targetPlayer) {
+        int processed = 0;
+        int lastPercentNotified = -1;
+        DateTime lastNotifyTime = DateTime.UtcNow;
 
-		int countSucc = 0;
-		int countUnload = 0;
-
-		try {
-			logger.Notification("[BetterEr Prospecting] Reprospecting started by {0} on player? {1}",
-				caller == null ? "console" : caller.PlayerName,
-				targetPlayer == null ? "all" : targetPlayer);
+        try {
+            logger.Notification("Reprospecting started by {0} on {1}", caller == null ? "console" : caller.PlayerName, targetPlayer == null ? "all" : $"{targetPlayer} player");
 
 			var oml = sapi.ModLoader.GetModSystem<WorldMapManager>().MapLayers.FirstOrDefault(ml => ml is OreMapLayer) as OreMapLayer;
 
@@ -101,10 +115,34 @@ public class ProspectingSystem : ModSystem {
 			isReprospecting = true;
 			chunkLoadTasks.Clear(); // Reruns
 
+            int allPlayerReadingsCount = PptTracker.getAllPlayerReadings(sapi).Count;
 
-			var allReadings = PptTracker.getAllPlayerReadings(sapi);
+            void NotifyCallerProgressIfNeeded() {
+                int current = Volatile.Read(ref processed);
+                int percent = current / allPlayerReadingsCount * 100;
 
-			// We could process all readings at the same time, but that might cause a lot of ram usage. Lets stick to oml per player ( huge cope )
+                lock (notifyLock) {
+                    // throttle time
+                    if ((DateTime.UtcNow - lastNotifyTime).Seconds < 20)
+                        return;
+
+                    // threshold step (e.g. every 10%)
+                    if (percent / 10 == lastPercentNotified / 10)
+                        return;
+
+                    lastPercentNotified = percent;
+                    lastNotifyTime = DateTime.UtcNow;
+                }
+
+                var message = $"[BetterEr Prospecting] Reprospect progress: {percent}% ({current}/{allPlayerReadingsCount})";
+
+                caller?.SendMessage(GlobalConstants.AllChatGroups, message, EnumChatType.Notification);
+                logger.Notification(message);
+            }
+
+            var localLists = new ConcurrentQueue<(string oreCode, double ppt)>();
+
+            // We could process all readings at the same time, but that might cause a lot of ram usage. Let's stick to oml per player ( huge cope )
 			foreach (var (_, readings) in oml.PropickReadingsByPlayer) {
 
 				// Step 1: Collect all unique chunks for this player's readings
@@ -125,24 +163,45 @@ public class ProspectingSystem : ModSystem {
 				await Task.WhenAll(chunksToLoad.Select(c => EnsureChunkLoaded(c.cx, c.cz)));
 
 				// Step 3: Process readings in parallel
-				var updatedReadings = await Task.WhenAll(readings.Select(reading => {
-					var readingBlock = reading.Position.AsBlockPos;
-					var readingChunk = sapi.WorldManager.GetChunk(readingBlock);
+                var updatedReadings = new PropickReading[readings.Count];
+                int index = 0;
 
-					if (readingChunk == null) {
-						Interlocked.Increment(ref countUnload);
-						return Task.FromResult(reading);
-					}
+                await Parallel.ForEachAsync(
+                    readings,
+                    new ParallelOptions {
+                        MaxDegreeOfParallelism = BetterErProspect.Config.ReprospectParellelism > 0 ? BetterErProspect.Config.ReprospectParellelism : Environment.ProcessorCount / 4,
+                        CancellationToken = _cts.Token
+                    },
+                    async (reading, ct) => {
+                        int i = Interlocked.Increment(ref index) - 1;
+                        var result = reading;
+                        var readingBlock = reading.Position.AsBlockPos;
+                        var readingChunk = sapi.WorldManager.GetChunk(readingBlock);
 
-					generateReadigs(sapi, readingBlock, GenerateBlockData(sapi, readingBlock), out PropickReading newReading);
-					Interlocked.Increment(ref countSucc);
-					return Task.FromResult(newReading);
-				}));
+                        if (readingChunk != null) {
+                            generateReadigs(
+                                sapi,
+                                readingBlock,
+                                GenerateBlockData(sapi, readingBlock),
+                                out PropickReading newReading,
+                                out List<(string oreCode, double ppt)> updatePairs
+                            );
+                            updatePairs.ForEach(localLists.Enqueue);
+                            result = newReading;
+                        }
+
+                        Interlocked.Increment(ref processed);
+                        NotifyCallerProgressIfNeeded();
+                        updatedReadings[i] = result;
+                    }
+                );
 
 				// Step 4: Replace readings safely
 				readings.Clear();
 				readings.AddRange(updatedReadings);
 			}
+
+            pptTracker?.UpdatePpt(localLists.ToList());
 
 			// Step 5: Serialize per player in parallel
 			var savegame = sapi.WorldManager.SaveGame;
@@ -155,7 +214,7 @@ public class ProspectingSystem : ModSystem {
 
 			// Step 6: Clear offline players
 			var onlineUids = sapi.World.AllOnlinePlayers.Select(p => p.PlayerUID).ToHashSet();
-			oml.PropickReadingsByPlayer.RemoveAllByKey(uid => onlineUids.Contains(uid));
+            oml.PropickReadingsByPlayer.RemoveAllByKey(onlineUids.Contains);
 
 			logger.Notification("[BetterEr Prospecting] Reprospecting finished");
 		} catch (Exception ex) {
@@ -163,7 +222,7 @@ public class ProspectingSystem : ModSystem {
 		} finally {
 			isReprospecting = false;
 			caller?.SendMessage(GlobalConstants.AllChatGroups,
-				$"[BetterEr Prospecting] Finished reprospecting. Changed {countSucc} readings. Kept unchanged {countUnload} unloaded chunk readings",
+                $"[BetterEr Prospecting] Finished reprospecting. Processed {processed} readings.",
 				EnumChatType.Notification);
 		}
 	}
@@ -210,8 +269,10 @@ public class ProspectingSystem : ModSystem {
 		return codeToFoundCount;
 	}
 
+    /// Note: The readings aren't updated, that must be done manually from the update pairs.
     /// <returns>Bool stating if readings have been generated successfully</returns>
-	public static bool generateReadigs(ICoreServerAPI sapi, BlockPos blockPos, Dictionary<string, int> codeToFoundOre, out PropickReading readings, List<DelayedMessage> delayedMessages = null) {
+    public static bool generateReadigs(ICoreServerAPI sapi, BlockPos blockPos, Dictionary<string, int> codeToFoundOre, out PropickReading readings,
+        out List<(string oreCode, double ppt)> updatePairs, List<DelayedMessage> delayedMessages = null) {
 		delayedMessages ??= [];
 
 		var world = sapi.World;
@@ -219,6 +280,7 @@ public class ProspectingSystem : ModSystem {
 		ProPickWorkSpace ppws = ObjectCacheUtil.TryGet<ProPickWorkSpace>(world.Api, "propickworkspace");
 		if (deposits == null) {
 			readings = null;
+            updatePairs = [];
 			return false;
 		}
 
@@ -233,7 +295,7 @@ public class ProspectingSystem : ModSystem {
 			Position = blockPos.ToVec3d()
 		};
 
-        var updatePairs = new List<(string oreCode, double ppt)>();
+        updatePairs = new List<(string oreCode, double ppt)>();
 
 		foreach (var (oreCode, empiricalAmount) in codeToFoundOre) {
 			var reading = new OreReading
@@ -262,10 +324,6 @@ public class ProspectingSystem : ModSystem {
 			readings.OreReadings[oreCode] = reading;
             updatePairs.Add((oreCode, reading.PartsPerThousand));
 		}
-
-
-        var pptTracker = sapi.ModLoader.GetModSystem<PptTracker>();
-        pptTracker?.UpdatePpt(updatePairs);
 
 		addMiscReadings(sapi, readings, blockPos, delayedMessages);
 		return true;

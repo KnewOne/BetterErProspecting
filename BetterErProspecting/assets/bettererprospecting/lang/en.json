@@ -81,6 +81,8 @@
   "BoreholeScansStone-description": "Allows borehole to scan stone",
 
   "DebugMode-setting": "Enable Debug Mode",
-  "DebugMode-description": "Enables in-game debug messages"
+  "DebugMode-description": "Enables in-game debug messages",
 
+  "ReprospectParellelism-setting": "Reprospect Parellelism",
+  "ReprospectParellelism-description": "Controlls amount of parellel executions for reprospect task. Higher number = faster, but more CPU intensive. 0 uses 1/4 of max cores"
 }

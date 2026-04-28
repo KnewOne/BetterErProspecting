@@ -92,7 +92,8 @@ public class PptTracker : ModSystem {
 			foreach (var kvp in loaded) {
 				oreData[kvp.Key] = kvp.Value;
 			}
-			Mod.Logger.Debug($"[BetterErProspecting] Loaded ppt data for {loaded.Count} ore codes from save");
+
+            Mod.Logger.Debug($"Loaded ppt data for {loaded.Count} ore codes from save");
 		} else {
 			// Absolute cold start. Lets normalize all readings
 			sapi.ModLoader.GetModSystem<ProspectingSystem>().ReprospectTask(null, null).Wait();
@@ -103,7 +104,7 @@ public class PptTracker : ModSystem {
 
 	private void OnSaveGameGettingSaved() {
 		if (oreData.IsEmpty) {
-			Mod.Logger.Debug("[BetterErProspecting] No data to save");
+            Mod.Logger.Debug("No data to save");
 			return;
 		}
 
@@ -111,7 +112,7 @@ public class PptTracker : ModSystem {
 		var dataToSave = new Dictionary<string, PptData>(oreData);
 		sapi.WorldManager.SaveGame.StoreData(SaveKey, SerializerUtil.Serialize(dataToSave, ms));
 
-		Mod.Logger.Debug($"[BetterErProspecting] Saved ppt data for {dataToSave.Count} ore codes");
+        Mod.Logger.Debug($"Saved ppt data for {dataToSave.Count} ore codes");
 	}
 
 	private void OnPlayerJoin(IServerPlayer byPlayer) {
@@ -130,7 +131,7 @@ public class PptTracker : ModSystem {
             oreData[kvp.Key] = kvp.Value;
         }
 
-        Mod.Logger.Debug($"[BetterErProspecting] Client received ppt data for ({string.Join(", ", packet.codeToData.Keys)}) ore codes");
+        Mod.Logger.Debug($"Client received ppt data for ({string.Join(", ", packet.codeToData.Keys)}) ore codes");
     }
 
     public void UpdatePpt(List<(string oreCode, double ppt)> updatePairs) {
@@ -204,7 +205,7 @@ public class PptTracker : ModSystem {
 
 		FillOreDataFromReadings();
 
-		Mod.Logger.Notification($"[BetterErProspecting] Dump and reload complete. Tracked {oreData.Count} ore codes.");
+        Mod.Logger.Notification($"Dump and reload complete. Tracked {oreData.Count} ore codes.");
 		return TextCommandResult.Success($"Successfully reloaded ore readings data. Now tracking {oreData.Count} ore codes.");
 	}
 
@@ -219,7 +220,7 @@ public class PptTracker : ModSystem {
 			} else if (attemptCount < maxAttempts) {
 				ScheduleBackfillWhenReady(attemptCount + 1);
 			} else {
-                Mod.Logger.Error("[BetterErProspecting] Timed out waiting for ProPickWorkSpace pageCodes to be populated");
+                Mod.Logger.Error("Timed out waiting for ProPickWorkSpace pageCodes to be populated");
 			}
         }, 1000);
 	}
@@ -227,11 +228,11 @@ public class PptTracker : ModSystem {
 	private void FillOreDataFromReadings() {
 		var ppws = ObjectCacheUtil.TryGet<ProPickWorkSpace>(sapi, "propickworkspace");
 		if (ppws?.pageCodes == null) {
-			Mod.Logger.Error("[BetterErProspecting] ProPickWorkSpace not available, couldn't perform backfill");
+            Mod.Logger.Error("ProPickWorkSpace not available, couldn't perform backfill");
 			return;
 		}
 
-		Mod.Logger.Notification($"[BetterErProspecting] Backfilling {ppws.pageCodes.Keys.Count} ore codes: {string.Join(", ", ppws.pageCodes.Keys)}");
+        Mod.Logger.Notification($"Backfilling {ppws.pageCodes.Keys.Count} ore codes: {string.Join(", ", ppws.pageCodes.Keys)}");
 
 		var allReadings = getAllPlayerReadings(sapi);
 
@@ -250,7 +251,7 @@ public class PptTracker : ModSystem {
 
         serverChannel?.BroadcastPacket(updatePacket);
 
-        Mod.Logger.Debug($"[BetterErProspecting] Backfilled from {allReadings.Count} readings");
+        Mod.Logger.Debug($"Backfilled from {allReadings.Count} readings");
 	}
 
 	// Fills per-player data in oml as well as returns list of all readings
@@ -258,7 +259,7 @@ public class PptTracker : ModSystem {
 		var result = new List<PropickReading>();
 		var oml = sapi.ModLoader?.GetModSystem<WorldMapManager>()?.MapLayers?.FirstOrDefault(ml => ml is OreMapLayer) as OreMapLayer;
 		if (oml == null) {
-			BetterErProspect.Logger.Warning("[BetterErProspecting] OreMapLayer not available for backfill");
+            BetterErProspect.Logger.Warning("OreMapLayer not available for backfill");
 			return result;
 		}
 

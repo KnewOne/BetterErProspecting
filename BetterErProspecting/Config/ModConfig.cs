@@ -34,4 +34,5 @@ public class ModConfig {
 	public bool BoreholeScansStone = false;
 
 	public bool DebugMode = false;
+    public int ReprospectParellelism = 0;
 }
