@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using BetterErProspecting.Prospecting;
 using ProtoBuf;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -50,10 +49,9 @@ public class PptTracker : ModSystem {
 	private ICoreServerAPI sapi;
 	private ICoreClientAPI capi;
 
-
-	public override void StartServerSide(ICoreServerAPI api) {
+    public override void StartServerSide(ICoreServerAPI api) {
 		base.StartServerSide(api);
-		sapi = api;
+        sapi = api;
 
 		sapi.ChatCommands.GetOrCreate("btrpr")
 			.RequiresPrivilege(Privilege.controlserver)
@@ -75,7 +73,6 @@ public class PptTracker : ModSystem {
 	public override void StartClientSide(ICoreClientAPI api) {
 		base.StartClientSide(api);
 		capi = api;
-        oreData.Clear();
 
 		clientChannel = api.Network.RegisterChannel(ChannelName)
 			.RegisterMessageType<PptDataPacket>()
@@ -83,8 +80,6 @@ public class PptTracker : ModSystem {
 	}
 
 	private void OnSaveGameLoaded() {
-		oreData.Clear();
-
 		byte[] savedData = sapi.WorldManager.SaveGame.GetData(SaveKey);
 		if (savedData != null) {
 			var loaded = SerializerUtil.Deserialize<Dictionary<string, PptData>>(savedData);
@@ -94,19 +89,16 @@ public class PptTracker : ModSystem {
 			}
 
             Mod.Logger.Debug($"Loaded ppt data for {loaded.Count} ore codes from save");
+            // Remove sometime later ( 1.23 ?). Fixing a 1.22 initial mod release loss of data on manual save
+            sapi.Event.ServerRunPhase(EnumServerRunPhase.RunGame, FillOreDataFromReadings);
 		} else {
-			// Absolute cold start. Lets normalize all readings
-			sapi.ModLoader.GetModSystem<ProspectingSystem>().ReprospectTask(null, null).Wait();
-			// We need the page codes and ppws delays to async RunGame phase action
-			sapi.Event.ServerRunPhase(EnumServerRunPhase.RunGame, () => { ScheduleBackfillWhenReady(); });
+            Mod.Logger.Notification("Found no ppt data for save file. Consider reprospecting");
+            sapi.Event.ServerRunPhase(EnumServerRunPhase.RunGame, FillOreDataFromReadings);
 		}
 	}
 
 	private void OnSaveGameGettingSaved() {
-		if (oreData.IsEmpty) {
-            Mod.Logger.Debug("No data to save");
-			return;
-		}
+        if (oreData.IsEmpty) return;
 
 		using var ms = new FastMemoryStream();
 		var dataToSave = new Dictionary<string, PptData>(oreData);
@@ -196,7 +188,6 @@ public class PptTracker : ModSystem {
 
 	private TextCommandResult DumpAndReload(TextCommandCallingArgs args) {
 		Mod.Logger.Notification($"[BetterErProspecting] Starting dump and reload of all ore readings data. Initiated by {args.Caller.Player.PlayerName}...");
-		oreData.Clear();
 
 		using (var ms = new FastMemoryStream()) {
 			var emptyDict = new Dictionary<string, PptData>();
@@ -207,22 +198,6 @@ public class PptTracker : ModSystem {
 
         Mod.Logger.Notification($"Dump and reload complete. Tracked {oreData.Count} ore codes.");
 		return TextCommandResult.Success($"Successfully reloaded ore readings data. Now tracking {oreData.Count} ore codes.");
-	}
-
-	private void ScheduleBackfillWhenReady(int attemptCount = 0) {
-		const int maxAttempts = 30;
-
-		sapi.Event.RegisterCallback((dt) =>
-		{
-			var ppws = ObjectCacheUtil.TryGet<ProPickWorkSpace>(sapi, "propickworkspace");
-			if (ppws?.pageCodes is { Count: > 0 }) {
-				FillOreDataFromReadings();
-			} else if (attemptCount < maxAttempts) {
-				ScheduleBackfillWhenReady(attemptCount + 1);
-			} else {
-                Mod.Logger.Error("Timed out waiting for ProPickWorkSpace pageCodes to be populated");
-			}
-        }, 1000);
 	}
 
 	private void FillOreDataFromReadings() {
@@ -250,7 +225,6 @@ public class PptTracker : ModSystem {
 		}
 
         serverChannel?.BroadcastPacket(updatePacket);
-
         Mod.Logger.Debug($"Backfilled from {allReadings.Count} readings");
 	}
 
@@ -278,7 +252,16 @@ public class PptTracker : ModSystem {
 	}
 
     public override void Dispose() {
-        oreData.Clear();
+        // World save happens after dispose was called. But if we don't dispose and clear this here, client would carry data over to another world.
+        // If we clear data in client start, it will clear server data in SP.
+        // If we clear data in save method, we would need to read it back which is less ideal.
+        if (sapi != null) {
+            OnSaveGameGettingSaved();
+        }
+
+        if (capi?.IsSinglePlayer == false || sapi is not null) {
+            oreData.Clear();
+        }
         base.Dispose();
     }
 }
