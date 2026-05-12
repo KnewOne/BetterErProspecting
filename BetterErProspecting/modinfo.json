@@ -6,13 +6,10 @@
     "KnewOne"
   ],
   "contributors": [
-    "NeoB",
-    "qua8ion",
-    "The_Revisionist",
-    "ChimMAG"
+    "NeoB"
   ],
   "description": "A compilation of configurable ProPick features.",
-  "version": "3.2.4",
+  "version": "3.2.5",
   "Side": "Universal",
   "dependencies": {
     "game": "1.22.0"

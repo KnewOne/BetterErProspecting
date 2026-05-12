@@ -1,0 +1,88 @@
+{
+  "density-block-based": "밀도 검색 모드 (장거리, 통계 기반 검색)",
+  "node": "노드 검색 모드 (중거리, 정확한 검색)",
+
+  "proximity": "근접 검색 모드 (단거리, 정확한 검색)",
+  "closest-ore-is": "가장 가까운 광석은 {0} 블록 떨어져 있습니다!",
+  "closest-ore-not-found": "{0} 블록 반경 내에서 광석을 찾을 수 없습니다.",
+  "promimity-vague-ore-nearby": "근처에서 광석을 발견했습니다",
+  "proximity-vague-ore-not-found": "근처에서 광석을 찾을 수 없습니다",
+
+  "borehole": "시추공 모드 (수직 원기둥-반경 기반 검색)",
+  "borehole-no-filter": "시추공이 어떤 유형도 검색하도록 구성되지 않았습니다",
+  "borehole-sample-upside": "시추 샘플은 블록의 상단에서만 채취할 수 있습니다",
+  "borehole-sample-taken": "시추 샘플이 채취되었습니다. ",
+  "borehole-not-found": "결과를 찾을 수 없습니다",
+  "borehole-found": "다음 항목을 찾았습니다: ",
+
+  "stone": "암석 모드 (장거리, 블록 거리 검색)",
+  "area-sample": "반경 {0}에 대한 영역 샘플이 채취되었습니다:",
+  "no-rocks-near": "근처에 암석이 없습니다",
+  "found-rocks": "다음 암석 유형을 발견했습니다",
+  "stone-mode-blocks-away": "{0}: {1} 블록 떨어져 있음",
+
+  "debug-bad-ppws-key": "[BetterEr Prospecting] ppws 탐사 가능 목록에 없는 광석 키를 발견했습니다. 의도한 것인가요? : {0}",
+  "debug-bad-ppws-key-expected": "[BetterEr Prospecting] 예상 키는 다음과 같습니다: {0}",
+
+  "_comment": "설정을 위한 구역입니다",
+
+  "Density": "밀도",
+  "Proximity": "근접",
+  "Stone": "암석",
+  "Borehole": "시추공",
+  "DebugMode": "디버그 모드",
+  "AtLeastOne": "최소 하나를 선택해야 합니다",
+
+  "_comment1": "Rock > R, as opposed to ore O",
+  "R": "R",
+  "worldmap-ores-only": "모든 광석",
+  "worldmap-rocks-only": "모든 암석",
+
+  "EnableDensityMode-setting": "밀도 모드 활성화",
+  "EnableDensityMode-description": "",
+  "OneShotDensity-setting": "원샷 밀도 모드",
+  "OneShotDensity-description": "새로운 밀도 모드가 활성화된 경우에는 영향을 미치지 않습니다",
+  "NewDensityMode-setting": "새로운 밀도 모드 사용",
+  "NewDensityMode-description": "기본 모드를 새로운 밀도 모드로 대체합니다",
+  "NewDensityDmg-setting": "새로운 밀도 도구 피해",
+  "NewDensityDmg-description": "새로운 밀도 모드의 도구 피해",
+  "DensityBlackListedOres-setting": "밀도 블랙리스트 광석",
+  "DensityBlackListedOres-description": "밀도 모드에서 무시되는 쉼표로 구분된 광석 코드. 광석 키를 사용하세요. 확실하지 않은 경우 기본값 사용.",
+
+  "AddProximityMode-setting": "근접 모드 활성화",
+  "AddProximityMode-description": "근접 모드를 활성화합니다. 가장 가까운 광석을 찾습니다. 구체 기반",
+  "ProximitySearchRadius-setting": "근접 모드 검색 반경",
+  "ProximitySearchRadius-description": "노드 모드를 유용하게 유지하려면 낮은 값을 권장합니다 (활성화된 경우)",
+  "ProximityVagueDescriptors-setting": "모호한 근접 설명",
+  "ProximityVagueDescriptors-description": "근접 탐사 시 정확한 블록 수 대신 존재/미발견 메시지를 작성합니다",
+  "ProximityDmg-setting": "근접 모드 도구 피해",
+  "ProximityDmg-description": "근접 모드의 도구 피해",
+
+  "AddStoneMode-setting": "암석 모드 활성화",
+  "AddStoneMode-description": "정확한 블록 거리와 함께 넓은 범위의 암석 검색 모드를 활성화합니다. 구체 기반",
+  "StoneSearchCreatesReadings-setting": "암석 모드 판독",
+  "StoneSearchCreatesReadings-description": "암석 모드를 사용할 때 판독값을 생성합니다. 항상 백분율을 표시하며, 백분율 설정과 상관없이 표시됩니다.",
+  "StonePercentSearch-setting": "암석 백분율 검색",
+  "StoneSearchRadius-setting": "암석 검색 반경",
+  "StonePercentSearch-description": "활성화된 경우, 암석 모드는 발견된 암석의 총 수에 대한 백분율을 표시합니다. 몰입감 향상",
+  "StoneSearchRadius-description": "암석 모드 검색 반경",
+  "StoneDmg-setting": "암석 모드 도구 피해",
+  "StoneDmg-description": "암석 모드의 도구 피해",
+
+  "AddBoreHoleMode-setting": "시추공 모드 활성화",
+  "AddBoreHoleMode-description": "직선 모드입니다. 블록 상단을 부술 때만 보고하며, 세계를 바닥까지 스캔하고 선택된 블록(광석 및 암석 블록 중 하나 또는 둘 다)을 보고합니다.",
+  "BoreholeDmg-setting": "시추공 모드 도구 피해",
+  "BoreholeDmg-description": "시추공 모드의 도구 피해",
+  "BoreholeRadius-setting": "시추공 반경",
+  "BoreholeRadius-description": "시추공 모드의 반경. 0이면 직선이 됩니다.",
+  "BoreholeScansOre-setting": "시추공 광석 스캔",
+  "BoreholeScansOre-description": "시추공이 광석을 스캔할 수 있도록 허용합니다.",
+  "BoreholeScansStone-setting": "시추공 암석 스캔",
+  "BoreholeScansStone-description": "시추공이 암석을 스캔할 수 있도록 허용합니다.",
+
+  "DebugMode-setting": "디버그 모드 활성화",
+  "DebugMode-description": "게임 내 디버그 메시지를 활성화합니다.",
+
+  "ReprospectParellelism-setting": "재탐사 병렬 처리",
+  "ReprospectParellelism-description": "재탐사 작업의 병렬 실행 수를 제어합니다. 숫자가 높을수록 빠르지만 CPU 사용량이 증가합니다. 0이면 최대 코어의 1/4을 사용합니다."
+}
