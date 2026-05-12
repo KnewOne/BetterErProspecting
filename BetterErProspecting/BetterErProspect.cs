@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using BetterErProspecting.Config;
@@ -38,13 +39,7 @@ public class BetterErProspect : ModSystem {
 
 		PatchUnpatch();
 		api.RegisterItemClass("ItemBetterErProspectingPick", typeof(ItemBetterErProspectingPick));
-
-        if (Api.ModLoader.IsModEnabled("prospecttogether")) {
-            UnpatchProspectTogether();
-            harmony.PatchCategory(nameof(PatchCategory.ProspectTogetherCompat));
-        }
 	}
-
 
     private void SubscribeToConfigChange() {
         ConfigLibModSystem system = Api.ModLoader.GetModSystem<ConfigLibModSystem>();
@@ -95,6 +90,7 @@ public class BetterErProspect : ModSystem {
 	private void PatchUnpatch() {
 		harmony.UnpatchAll(Mod.Info.ModID);
 		harmony.PatchCategory(nameof(PatchCategory.Always));
+        handleProspectTogether();
 
 		if (ModConfig.Instance.NewDensityMode) {
 			harmony.PatchCategory(nameof(PatchCategory.NewDensity));
@@ -105,20 +101,22 @@ public class BetterErProspect : ModSystem {
 		}
 	}
 
-	// Maybe some better place ?
-	private void UnpatchProspectTogether() {
-		var original = AccessTools.Method(typeof(OreMapLayer), nameof(OreMapLayer.OnDataFromServer));
-		var ptAssembly = AppDomain.CurrentDomain.GetAssemblies()
-			.FirstOrDefault(a => a.GetName().Name == "ProspectTogether");
-		if (ptAssembly == null)
-			return;
+    private void handleProspectTogether() {
+        if (!Api.ModLoader.IsModEnabled("prospecttogether")) return;
 
-		var patchType = ptAssembly.GetType("ProspectTogether.Client.OreMapLayerPatch");
-		var theirPrefix = patchType?.GetMethod("OnDataFromServer", BindingFlags.Static | BindingFlags.NonPublic);
-		if (theirPrefix != null) {
-			harmony.Unpatch(original, theirPrefix);
-		}
-	}
+        var original = AccessTools.Method(typeof(OreMapLayer), nameof(OreMapLayer.OnDataFromServer));
+
+        var info = Harmony.GetPatchInfo(original);
+        if (info?.Prefixes != null) {
+            foreach (var patch in info.Prefixes.ToList()) {
+                if (patch.owner == "prospecttogether") {
+                    harmony.Unpatch(original, patch.PatchMethod);
+                }
+            }
+        }
+
+        harmony.PatchCategory(nameof(PatchCategory.ProspectTogetherCompat));
+    }
 
 	public enum PatchCategory {
 		Always,
