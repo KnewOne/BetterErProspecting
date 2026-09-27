@@ -92,10 +92,15 @@ public partial class ItemBetterErProspectingPick {
 
 		if (block.BlockMaterial != EnumBlockMaterial.Ore || block.Variant == null)
 			return false;
-		if (!block.Variant.TryGetValue("type", out string oreKey))
-			return false;
 
-		if (!cache.TryGetValue(oreKey, out typeKey)) {
+        string oreKey = block.Variant["type"]; // npe safe
+
+        // TODO: Remove boric crutch when mod author fixes variants for oil
+        if (oreKey == null && !handledBoric(block, ref oreKey!)) {
+            return false;
+        }
+
+        if (!cache.TryGetValue(oreKey, out typeKey!)) {
 			typeKey = ConvertChildRocks(oreKey);
 			cache[oreKey] = typeKey;
 		}
@@ -103,6 +108,7 @@ public partial class ItemBetterErProspectingPick {
 		fullKey = "ore-" + typeKey;
 		return true;
 	}
+
 	public static bool IsOre(Block block, Dictionary<string, string> cache, out string fullKey) {
 		return IsOre(block, cache, out fullKey, out _);
 	}
@@ -134,4 +140,13 @@ public partial class ItemBetterErProspectingPick {
         dropMultiplier = 0;
 		return true;
 	}
+
+    private static bool handledBoric(Block block, ref string oreKey) {
+        if (block.Code.Domain == "boricalchemy" && block.Code.Path.StartsWith("oily")) {
+            oreKey = block.Code.Path;
+            return true;
+        }
+
+        return false;
+    }
 }
