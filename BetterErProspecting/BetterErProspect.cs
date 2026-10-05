@@ -43,7 +43,7 @@ public class BetterErProspect : ModSystem {
         ModConfig.Instance = Api.LoadModConfig<ModConfig>(ModConfig.ConfigName);
         if (ModConfig.Instance != null) return;
         ModConfig.Instance = new ModConfig();
-        Logger.Error("Failed to load config from file. Creating a default config");
+        Logger.Notification("Failed to load config from file. Creating a default config");
     }
 
 

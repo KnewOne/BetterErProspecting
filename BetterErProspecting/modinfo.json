@@ -9,7 +9,7 @@
     "NeoB"
   ],
   "description": "A compilation of configurable ProPick features.",
-  "version": "3.4.11",
+  "version": "3.4.12",
   "Side": "Universal",
   "dependencies": {
     "game": "1.22.0"
