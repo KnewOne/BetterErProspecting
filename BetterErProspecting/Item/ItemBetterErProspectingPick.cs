@@ -346,6 +346,7 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 	}
 	public override void OnUnloaded(ICoreAPI coreApi) {
         modeDataStorage.Values.Foreach(item => item.Skill.Dispose());
+        ConfigManager.ReloadTools -= RegenerateToolModes;
 		base.OnUnloaded(coreApi);
 	}
 
