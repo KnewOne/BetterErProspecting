@@ -8,24 +8,13 @@ using Vintagestory.GameContent;
 
 namespace BetterErProspecting.Patches;
 
-[HarmonyPatch(typeof(PropickReading), "ToHumanReadable")]
+[HarmonyPatch(typeof(PropickReading), nameof(PropickReading.ToHumanReadable))]
 [HarmonyPatchCategory(nameof(PatchManager.PatchCategory.Always))]
 public class ReadingLinearFactorPatch {
 	static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions) {
-		// We're looking for the pattern:
-		// oreReading2.TotalFactor * 7.5
-		// which in IL looks like:
-		// ldc.r8 7.5
-		// mul
-
 		var matcher = new CodeMatcher(instructions);
 
-		// Search for the 7.5 constant followed by multiplication
-		matcher.Start()
-			.MatchStartForward(
-				new CodeMatch(OpCodes.Ldc_R8, 7.5),
-				new CodeMatch(OpCodes.Mul)
-			);
+        matcher.Start().MatchStartForward(new CodeMatch(OpCodes.Ldc_R8, 7.5));
 
 		if (matcher.IsInvalid) {
 			BetterErProspect.Logger?.Error("[PropickReadingPatch] Failed to find the 7.5 multiplication pattern");

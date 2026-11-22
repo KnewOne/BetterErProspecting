@@ -1,176 +1,116 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection.Emit;
+using System.Text;
 using BetterErProspecting.Item;
 using HarmonyLib;
 using Vintagestory.API.Config;
-using Vintagestory.API.MathTools;
 using Vintagestory.GameContent;
 
-namespace BetterErProspecting.Patches;
+namespace BetterErProspecting.Patches.Stone;
 
-[HarmonyPatch(typeof(PropickReading), "ToHumanReadable")]
+// Processes "rock-" keys in PropickReading.ToHumanReadable (vanilla treats every key as an ore).
+// Lines starting with ">" in the comments below are the code we inject, the rest is vanilla.
+[HarmonyPatch(typeof(PropickReading), nameof(PropickReading.ToHumanReadable))]
 [HarmonyPatchCategory(nameof(PatchManager.PatchCategory.Always))]
 public class ReadingToHumanReadableStone {
+    private const string LogTag = "[ReadingToHumanReadableStone]";
+    private const string RockPrefix = "rock-";
+
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions) {
-        // We want to insert before source.Add(...) at line 70:
-        //   source.Add(new KeyValuePair<double, string>(oreReading2.TotalFactor, str2));
-        //
-        // IL pattern for source.Add:
-        //   ldloc.s      source
-        //   ldloc.s      oreReading2
-        //   ldfld        OreReading::TotalFactor
-        //   ldloc.s      str2
-        //   newobj       KeyValuePair<double, string>
-        //   callvirt     List.Add
-        //
-        // We insert before this: str2 = ProcessStoneReading(languageCode, pageCodes, oreReading1, str2)
+        var original = instructions.ToList();
+        var matcher = new CodeMatcher(original);
 
-        var matcher = new CodeMatcher(instructions);
-
-        var totalFactorField = AccessTools.Field(typeof(OreReading), nameof(OreReading.TotalFactor));
-        var kvpCtor = AccessTools.Constructor(typeof(KeyValuePair<double, string>), new[] { typeof(double), typeof(string) });
-        var listAddMethod = AccessTools.Method(typeof(List<KeyValuePair<double, string>>), nameof(List<>.Add));
-        var helperMethod = AccessTools.Method(typeof(ReadingToHumanReadableStone), nameof(ProcessStoneReading));
-
-        // Find the pattern for source.Add(new KeyValuePair<double, string>(oreReading2.TotalFactor, str2))
-        // IL pattern at line 70:
-        // IL_016a: ldloc.0      // source
-        // IL_016b: ldloc.s      oreReading2
-        // IL_016d: ldfld        OreReading::TotalFactor
-        // IL_0172: ldloc.s      str2
-        // IL_0174: newobj       KeyValuePair<double, string>
-        // IL_0179: callvirt     List.Add
-        var getKeyMethod = AccessTools.PropertyGetter(typeof(KeyValuePair<string, OreReading>), nameof(KeyValuePair<string, OreReading>.Key));
-
-        // First find oreReading1 local by searching for call to get_Key
-        matcher.Start()
-            .MatchStartForward(
-                new CodeMatch(OpCodes.Ldloca_S),
-                new CodeMatch(OpCodes.Call, getKeyMethod)
-            );
-
-        if (matcher.IsInvalid) {
-            BetterErProspect.Logger?.Error("[PropickReadingRockDisplayPatch] Failed to find oreReading1 local");
-            return instructions;
+        if (!PatchMainList(matcher) || !PatchTraceList(matcher)) {
+            BetterErProspect.Logger?.Error($"{LogTag} Patch not applied, vanilla output will be used.");
+            return original;
         }
-
-        var oreReading1LocalOperand = matcher.Operand;
-
-        // Now find the source.Add pattern: ldloc.0 -> ldloc.s -> ldfld TotalFactor
-        matcher.Start()
-            .MatchStartForward(
-                new CodeMatch(i => i.opcode == OpCodes.Ldloc_0 || i.opcode == OpCodes.Ldloc || i.opcode == OpCodes.Ldloc_S),
-                new CodeMatch(i => i.opcode == OpCodes.Ldloc_S || i.opcode == OpCodes.Ldloc),
-                new CodeMatch(OpCodes.Ldfld, totalFactorField),
-                new CodeMatch(i => i.opcode == OpCodes.Ldloc_S || i.opcode == OpCodes.Ldloc),
-                new CodeMatch(OpCodes.Newobj, kvpCtor),
-                new CodeMatch(OpCodes.Callvirt, listAddMethod)
-            );
-
-        if (matcher.IsInvalid) {
-            BetterErProspect.Logger?.Error("[PropickReadingRockDisplayPatch] Failed to find source.Add pattern");
-            return instructions;
-        }
-
-        // Get str2 local from the ldloc.s before newobj (position 3 in pattern)
-        matcher.Advance(3);
-        var str2LocalOperand = matcher.Operand;
-
-        // Go back to start of pattern (ldloc.0 source) to insert before it
-        matcher.Advance(-3);
-
-        // Insert: str2 = ProcessStoneReading(languageCode, oreReading1, str2)
-        matcher.Insert(
-            new CodeInstruction(OpCodes.Ldarg_1), // languageCode
-            new CodeInstruction(OpCodes.Ldloca_S, oreReading1LocalOperand),
-            new CodeInstruction(OpCodes.Ldobj, typeof(KeyValuePair<string, OreReading>)),
-            new CodeInstruction(OpCodes.Ldloc_S, str2LocalOperand),
-            new CodeInstruction(OpCodes.Call, helperMethod),
-            new CodeInstruction(OpCodes.Stloc_S, str2LocalOperand)
-        );
-
-        // Second injection: after str4 = String.Format(...) in the "Miniscule amounts" section
-        // IL pattern:
-        // IL_02c1: call         string String::Format(string, object, object)
-        // IL_02c6: stloc.s      str4
-        // IL_02c8: ldloc.s      stringBuilder2
-        // IL_02ca: ldloc.s      str4
-        // IL_02cc: callvirt     StringBuilder::Append(string)
-        var stringFormatMethod = AccessTools.Method(typeof(string), nameof(string.Format), new[] { typeof(string), typeof(object), typeof(object) });
-        var stringBuilderAppendMethod = AccessTools.Method(typeof(System.Text.StringBuilder), nameof(System.Text.StringBuilder.Append), new[] { typeof(string) });
-        var traceHelperMethod = AccessTools.Method(typeof(ReadingToHumanReadableStone), nameof(ProcessTraceReading));
-
-        matcher.Start()
-            .MatchStartForward(
-                new CodeMatch(OpCodes.Call, stringFormatMethod),
-                new CodeMatch(i => i.opcode == OpCodes.Stloc_S || i.opcode == OpCodes.Stloc),
-                new CodeMatch(i => i.opcode == OpCodes.Ldloc_S || i.opcode == OpCodes.Ldloc),
-                new CodeMatch(i => i.opcode == OpCodes.Ldloc_S || i.opcode == OpCodes.Ldloc),
-                new CodeMatch(OpCodes.Callvirt, stringBuilderAppendMethod)
-            );
-
-        if (matcher.IsInvalid) {
-            BetterErProspect.Logger?.Error("[PropickReadingRockDisplayPatch] Failed to find str4 assignment pattern");
-            return matcher.InstructionEnumeration();
-        }
-
-        // Get str4 local (position 1 - the stloc.s after String.Format)
-        matcher.Advance(1);
-        var str4LocalOperand = matcher.Operand;
-
-        // Get key local (position 3 - the ldloc.s str4 before Append)
-        // Actually we need the 'key' variable - search for it in the pattern
-        // Looking at IL: ldloc.s key is at IL_02b0, before String.Concat
-        // We need to find it separately - search for "ore-" string concatenation
-        var stringConcatMethod = AccessTools.Method(typeof(string), nameof(string.Concat), new[] { typeof(string), typeof(string) });
-
-        var keySearchMatcher = new CodeMatcher(instructions);
-        keySearchMatcher.Start()
-            .MatchStartForward(
-                new CodeMatch(OpCodes.Ldstr, "ore-"),
-                new CodeMatch(i => i.opcode == OpCodes.Ldloc_S || i.opcode == OpCodes.Ldloc),
-                new CodeMatch(OpCodes.Call, stringConcatMethod)
-            );
-
-        if (keySearchMatcher.IsInvalid) {
-            BetterErProspect.Logger?.Error("[PropickReadingRockDisplayPatch] Failed to find key local");
-            return matcher.InstructionEnumeration();
-        }
-
-        keySearchMatcher.Advance(1);
-        var keyLocalOperand = keySearchMatcher.Operand;
-
-        // Move past stloc.s str4 to insert after it
-        matcher.Advance(1);
-
-        // Insert: str4 = ProcessTraceReading(languageCode, key, str4)
-        matcher.Insert(
-            new CodeInstruction(OpCodes.Ldarg_1), // languageCode
-            new CodeInstruction(OpCodes.Ldloc_S, keyLocalOperand), // key
-            new CodeInstruction(OpCodes.Ldloc_S, str4LocalOperand), // str4
-            new CodeInstruction(OpCodes.Call, traceHelperMethod),
-            new CodeInstruction(OpCodes.Stloc_S, str4LocalOperand)
-        );
 
         return matcher.InstructionEnumeration();
     }
 
-    private static string ProcessTraceReading(string languageCode, string key, string currentValue) {
-        if (!key.StartsWith("rock-"))
-            return currentValue;
+    // above 2.5%
+    // - str2 = oreReading1.Key;
+    // > str2 = ProcessStoneReading(languageCode, oreReading1);
+    private static bool PatchMainList(CodeMatcher matcher) {
+        matcher.Start().MatchStartForward(
+            new CodeMatch(i => i.opcode == OpCodes.Ldloca_S), // oreReading1
+            new CodeMatch(OpCodes.Call, AccessTools.PropertyGetter(typeof(KeyValuePair<string, OreReading>), "Key")),
+            new CodeMatch(OpCodes.Stloc_S)); // str2
 
-        return ItemBetterErProspectingPick.getHandbookLinkOrName(BetterErProspect.Api.World, languageCode, key);
+        if (matcher.IsInvalid) {
+            BetterErProspect.Logger?.Error($"{LogTag} `str2 = oreReading1.Key` not found.");
+            return false;
+        }
+
+        var oreReading1 = matcher.Operand; // must be read before advancing
+
+        matcher
+            .SetAndAdvance(OpCodes.Ldarg_1, null) // languageCode
+            .SetAndAdvance(OpCodes.Ldloc_S, oreReading1)
+            .Insert(new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(ReadingToHumanReadableStone), nameof(ProcessStoneReading))));
+
+        return true;
     }
 
-    private static string ProcessStoneReading(string languageCode, KeyValuePair<string, OreReading> oreReading1, string currentValue) {
-        if (!oreReading1.Key.StartsWith("rock-"))
-            return currentValue;
+    // "Miniscule amounts of ..." list:
+    //   str4 = $"<a href=\"handbook://{str3}\">{Lang.GetL(languageCode, "ore-" + key)}</a>";
+    // > str4 = ProcessTraceReading(languageCode, key, str4);
+    //   stringBuilder2.Append(str4);
+    private static bool PatchTraceList(CodeMatcher matcher) {
+        // Walk forward once: first the `key` local...
+        matcher.Start().MatchStartForward(
+            new CodeMatch(OpCodes.Ldstr, "ore-"),
+            new CodeMatch(OpCodes.Ldloc_S), // key
+            new CodeMatch(OpCodes.Call, AccessTools.Method(typeof(string), nameof(string.Concat), new[] { typeof(string), typeof(string) })));
 
-        var reading = oreReading1.Value;
+        if (matcher.IsInvalid) {
+            BetterErProspect.Logger?.Error($"{LogTag} `\"ore-\" + key` not found.");
+            return false;
+        }
 
-        var oreName = Lang.GetL(languageCode, reading.DepositCode);
-        var percent = reading.TotalFactor.ToString("0.##%");
+        var key = matcher.InstructionAt(1).operand;
 
-        return $"{percent} {oreName}";
+        // ...then the str4 assignment
+        matcher.MatchStartForward(
+            new CodeMatch(OpCodes.Call, AccessTools.Method(typeof(string), nameof(string.Format), new[] { typeof(string), typeof(object), typeof(object) })),
+            new CodeMatch(OpCodes.Stloc_S), // str4
+            new CodeMatch(OpCodes.Ldloc_S), // stringBuilder2
+            new CodeMatch(OpCodes.Ldloc_S), // str4
+            new CodeMatch(OpCodes.Callvirt, AccessTools.Method(typeof(StringBuilder), nameof(StringBuilder.Append), new[] { typeof(string) })));
+
+        if (matcher.IsInvalid) {
+            BetterErProspect.Logger?.Error($"{LogTag} str4 assignment not found.");
+            return false;
+        }
+
+        var str4 = matcher.InstructionAt(1).operand;
+
+        matcher.Advance(2); // after `stloc str4`
+        matcher.Insert(
+            new CodeInstruction(OpCodes.Ldarg_1), // languageCode
+            new CodeInstruction(OpCodes.Ldloc_S, key),
+            new CodeInstruction(OpCodes.Ldloc_S, str4),
+            new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(ReadingToHumanReadableStone), nameof(ProcessTraceReading))),
+            new CodeInstruction(OpCodes.Stloc_S, str4));
+
+        return true;
+    }
+
+    // "12.3% Granite" for rocks, the key itself otherwise
+    private static string ProcessStoneReading(string languageCode, KeyValuePair<string, OreReading> entry) {
+        if (!entry.Key.StartsWith(RockPrefix))
+            return entry.Key;
+
+        var reading = entry.Value;
+        return $"{reading.TotalFactor.ToString("0.##%")} {Lang.GetL(languageCode, reading.DepositCode)}";
+    }
+
+    // Handbook link (or plain name) for the rock
+    private static string ProcessTraceReading(string languageCode, string key, string vanillaLink) {
+        if (!key.StartsWith(RockPrefix))
+            return vanillaLink;
+
+        return ItemBetterErProspectingPick.getHandbookLinkOrName(BetterErProspect.Api.World, languageCode, key);
     }
 }
