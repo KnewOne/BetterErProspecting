@@ -7,7 +7,6 @@ namespace BetterErProspecting.Patches.Stone;
 
 [HarmonyPatch(typeof(OreMapLayer), "ShouldDisplayReading")]
 // Always because stone readings are still in save files
-[HarmonyPatchCategory(nameof(PatchManager.PatchCategory.Always))]
 public class OreMapRebuildShouldDisplayReadingPatch {
     private static readonly MethodInfo GetTotalFactorMethod = AccessTools.Method(typeof(PropickReading), "GetTotalFactor");
 

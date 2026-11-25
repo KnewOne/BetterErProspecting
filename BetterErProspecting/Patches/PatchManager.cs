@@ -18,7 +18,7 @@ public static class PatchManager {
 
     private static void PatchUnpatch() {
         harmony.UnpatchAll(modId);
-        harmony.PatchCategory(nameof(PatchCategory.Always));
+        harmony.PatchAllUncategorized();
         handleProspectTogether();
 
         if (ModConfig.Instance.NewDensityMode) {
@@ -48,7 +48,6 @@ public static class PatchManager {
     }
 
     public enum PatchCategory {
-        Always,
         NewDensity,
         StoneReadings,
         ProspectTogetherCompat

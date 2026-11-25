@@ -139,6 +139,8 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 
         ProPickWorkSpace ppws = ObjectCacheUtil.TryGet<ProPickWorkSpace>(api, "propickworkspace");
 
+        sapi.ModLoader.GetModSystem<ModSystemOreMap>()?.DidProbe(readings, serverPlayer); // after updateppt, before .ToHumanReadable; latter modifies values, former needs to come to client first. Making a copy is expensive
+
 		var textResults = readings.ToHumanReadable(serverPlayer.LanguageCode, ppws.pageCodes);
         serverPlayer.Info(textResults);
 
@@ -148,7 +150,6 @@ public sealed partial class ItemBetterErProspectingPick : ItemProspectingPick {
 
         delayedMessages.ForEach(msg => msg.Send(serverPlayer));
 
-		sapi.ModLoader.GetModSystem<ModSystemOreMap>()?.DidProbe(readings, serverPlayer);
 
         return config.NewDensityDmg;
 	}

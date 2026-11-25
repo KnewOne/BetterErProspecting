@@ -11,7 +11,6 @@ namespace BetterErProspecting.Patches.Stone;
 // Sorts readings by locale name
 // Filters out rock readings from WPs if not enabled
 [HarmonyPatch(typeof(OreMapLayer), "GetOreFilterDropdownData")]
-[HarmonyPatchCategory(nameof(PatchManager.PatchCategory.Always))]
 public class OreMapDropdownDataPatch {
     static void Postfix(ref DropDownEntry[] __result) {
         var stoneReadingsEnabled = BetterErProspect.Config.StoneSearchCreatesReadings;

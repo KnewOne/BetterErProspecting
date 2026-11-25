@@ -7,7 +7,6 @@ using Vintagestory.GameContent;
 namespace BetterErProspecting.Patches.Stone;
 
 [HarmonyPatch(typeof(OreMapComponent), "GetComponentColor")]
-[HarmonyPatchCategory(nameof(PatchManager.PatchCategory.Always))]
 // Adds rock- and ore- grouped readings dropdown option handling
 public class OreMapComponentColorPatch {
     static bool Prefix(OreMapComponent __instance) {

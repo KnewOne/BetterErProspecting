@@ -12,7 +12,6 @@ namespace BetterErProspecting.Patches.Stone;
 // Processes "rock-" keys in PropickReading.ToHumanReadable (vanilla treats every key as an ore).
 // Lines starting with ">" in the comments below are the code we inject, the rest is vanilla.
 [HarmonyPatch(typeof(PropickReading), nameof(PropickReading.ToHumanReadable))]
-[HarmonyPatchCategory(nameof(PatchManager.PatchCategory.Always))]
 public class ReadingToHumanReadableStone {
     private const string LogTag = "[ReadingToHumanReadableStone]";
     private const string RockPrefix = "rock-";
